@@ -339,8 +339,11 @@
 
           <!-- Dynamic Cadence Mode Tabs -->
           <div class="cadence-modes" role="tablist" aria-label="Cadence Modes">
-            <button type="button" class="cadence-mode-btn active" id="cadence-tab-interval" onclick="selectCadenceMode('interval')">
-              <span>⚡ Dynamic Interval</span>
+            <button type="button" class="cadence-mode-btn active" id="cadence-tab-immediate" onclick="selectCadenceMode('immediate')">
+              <span>⚡ Immediate (No Time Set)</span>
+            </button>
+            <button type="button" class="cadence-mode-btn" id="cadence-tab-interval" onclick="selectCadenceMode('interval')">
+              <span>⏱️ Dynamic Interval</span>
             </button>
             <button type="button" class="cadence-mode-btn" id="cadence-tab-peak_hours" onclick="selectCadenceMode('peak_hours')">
               <span>🎮 Viral Peak Hours</span>
@@ -359,8 +362,18 @@
           <!-- Cadence Mode Panels -->
           <div class="cadence-panel mt-md">
             
+            <!-- 0. Immediate Panel -->
+            <div id="cadence-panel-immediate" class="cadence-mode-view">
+              <div class="card" style="background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 8px; padding: 1rem;">
+                <h4 style="margin: 0 0 0.5rem 0; color: #d8b4fe;">⚡ Immediate Continuous Publishing (No Hard Time Set)</h4>
+                <p style="margin: 0; color: #e2e8f0; font-size: 0.9rem; line-height: 1.5;">
+                  Videos are selected immediately across your configured sources, verified through AI Quality Check, and published to YouTube immediately. As soon as each short is uploaded, the next short is curated and published continuously with <strong>no hard schedule delays</strong>.
+                </p>
+              </div>
+            </div>
+
             <!-- 1. Interval Panel -->
-            <div id="cadence-panel-interval" class="cadence-mode-view">
+            <div id="cadence-panel-interval" class="cadence-mode-view hidden">
               <label class="cadence-input-label">Publish an automated short every:</label>
               <div class="interval-controls">
                 <div class="interval-stepper">
