@@ -69,7 +69,7 @@ The AI gateway ([`lib/aiClient.js`](lib/aiClient.js)) connects directly to Apple
 * **Instant Structured JSON**: Automatically configures `enable_thinking: false` in the MLX chat template, producing direct JSON without reasoning token latency.
 * **Multimodal Vision Readiness**: Architecture prepared with `mlx-vlm` support for local vision-language model keyframe inspection.
 * **Automated Daemon**: Node automatically launches the server on port `8080` if not already running.
-* **Cloud Fallback**: Automatically cascades to Google Gemini (`gemini-2.5-flash` with 1,500 req/day quota) if MLX is unreachable or explicitly disabled.
+* **Cloud Fallback**: Automatically cascades to Google Gemini (`gemini-3.8-flash` with 1,500 req/day quota) if MLX is unreachable or explicitly disabled.
 
 ### Useful MLX Commands
 ```bash
@@ -177,7 +177,7 @@ MLX_BASE_URL=http://127.0.0.1:8080
 
 # Cloud Fallback (Optional)
 GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.8-flash
 DISABLE_OPENCODE=true
 
 # YouTube Bot Bypass & Cookie Authentication

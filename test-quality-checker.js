@@ -46,14 +46,14 @@ async function runTests() {
   assert(hSlop.decision === 'REJECT', 'Heuristic rejects AI slop');
   assert(hSlop.isAiSlop === true, 'Heuristic identifies isAiSlop = true');
 
-  // Test 3: Heuristic Person Name Detection
-  console.log('\n── Test 3: Heuristic Person Name Detection ──');
+  // Test 3: Heuristic Person Name Exemption (Allowed in Titles/Descriptions)
+  console.log('\n── Test 3: Person/Celebrity Name Exemption in Titles ──');
   const hPerson = heuristicQualityCheck({
-    title: 'MrBeast hands out $50,000 cash in challenge',
-    uploader: 'ChallengeChannel'
+    title: 'Timothée Chalamet best acting scenes edit #shorts',
+    uploader: 'CinemaEdits'
   });
-  assert(hPerson.decision === 'REJECT', 'Heuristic rejects video with MrBeast');
-  assert(hPerson.hasPersonName === true, 'Heuristic identifies hasPersonName = true');
+  assert(hPerson.decision === 'PASS', 'Heuristic allows celebrity/actor names in movie edits');
+  assert(hPerson.isAiSlop === false, 'isAiSlop is false');
 
   // Test 4: OpenCode Live AI Quality Check on Clean Gaming Clip
   console.log('\n── Test 4: OpenCode Check on Clean Gaming Clip ──');
@@ -69,22 +69,21 @@ async function runTests() {
   console.log(`  Reason: ${liveClean.reason}`);
   assert(liveClean.decision === 'PASS', 'OpenCode passes clean gaming content');
   assert(liveClean.isAiSlop === false, 'isAiSlop is false');
-  assert(liveClean.hasPersonName === false, 'hasPersonName is false');
 
-  // Test 5: OpenCode Live Check on Person Name
-  console.log('\n── Test 5: OpenCode Check on Person Name Video ──');
+  // Test 5: OpenCode Live Check on Celebrity Edit Video (Allowed)
+  console.log('\n── Test 5: OpenCode Check on Celebrity Edit Video (Allowed) ──');
   const livePerson = await checkVideoQuality({
     videoPath: testVideoPath,
     metadata: {
-      title: 'Elon Musk announces Tesla Optimus Robot in Minecraft #Shorts',
-      uploader: 'TeslaFanChannel',
-      description: 'Elon Musk talks about humanoid AI robotics.'
+      title: 'Robert Downey Jr Iron Man Return Scene Edit #Shorts',
+      uploader: 'MarvelEditsChannel',
+      description: 'The moment Tony Stark says I am Iron Man.'
     }
   });
   console.log(`  Decision: ${livePerson.decision} (by ${livePerson.usedModel})`);
   console.log(`  Reason: ${livePerson.reason}`);
-  assert(livePerson.decision === 'REJECT', 'OpenCode rejects video with person name (Elon Musk)');
-  assert(livePerson.hasPersonName === true, 'hasPersonName is true');
+  assert(livePerson.decision === 'PASS', 'OpenCode passes celebrity movie edit');
+  assert(livePerson.isAiSlop === false, 'isAiSlop is false');
 
   // Test 6: OpenCode Live Check on AI Slop
   console.log('\n── Test 6: OpenCode Check on AI Slop Video ──');

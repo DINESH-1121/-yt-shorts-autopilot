@@ -10,6 +10,7 @@
     "mlx:chat": ".venv-mlx/bin/python -m mlx_lm chat --model mlx-community/Qwen3.5-9B-MLX-4bit"
   },
   "dependencies": {
+    "canvas": "^3.2.3",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
     "googleapis": "^144.0.0",

@@ -9,4 +9,5 @@ cookies.txt
 cookies*.txt
 .venv*
 .DS_Store
+test-watermark-previews/
 

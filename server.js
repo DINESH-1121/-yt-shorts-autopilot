@@ -9,14 +9,17 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ── Auto-Pilot Modules ──────────────────────────────────────────────────
-const { getConfig, saveConfig, getHistory, isAlreadyUploaded, addToHistory, invalidateConfigCache } = require('./lib/store');
+const { getConfig, saveConfig, getHistory, isAlreadyUploaded, addToHistory, invalidateConfigCache, isDailyQuotaReached } = require('./lib/store');
 const { runAutoPilotCycle, setupScheduler, getRecentLogs, isBusy, clearCandidatePool } = require('./lib/autopilot');
 const { rewriteSingleVideoMetadata, normalizeModelName } = require('./lib/aiEngine');
 const { listFreeModels } = require('./lib/aiClient');
-const { getScheduleInfo, buildCronFromCadence } = require('./lib/cadence');
+const { getScheduleInfo, buildCronFromCadence, calculateNextOptimalPublishSlot } = require('./lib/cadence');
 const { ensureShortsFormat } = require('./lib/shortsFormatter');
+const { applyWatermarkInPlace } = require('./lib/watermark');
 const { authArgs, resetAuthArgsCache, describeError } = require('./lib/ytdlp');
 const { checkVideoQuality, heuristicQualityCheck } = require('./lib/qualityChecker');
+const { createBeatSyncedShort } = require('./lib/beatSyncTranscoder');
+const { applyVisualHookInPlace, generateHookText } = require('./lib/visualHook');
 
 // ── Directories ──────────────────────────────────────────────────────────
 const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
@@ -301,7 +304,14 @@ async function uploadToYouTube(filePath, metadata, onProgress) {
 
   onProgress?.('Uploading to YouTube...');
 
+    const isAnimeOrEdit = /anime|edit|edits|manga|marvel|cinematic|film|animation|solo leveling|attack on titan|jujutsu|demon slayer/i.test(`${metadata.title} ${metadata.description || ''}`);
     const isGaming = /gta|game|gaming|gameplay|clutch|ps5|xbox|unreal|valorant|minecraft|cod|fortnite|wukong|esports/i.test(`${metadata.title} ${metadata.description || ''}`);
+    const categoryId = isAnimeOrEdit ? '1' : (isGaming ? '20' : '1'); // Default '1' (Film & Animation) for Anime/Marvel edits
+
+    // Calculate next optimal publishing slot (18:00 IST / 12:30 UTC or 21:30 IST / 16:00 UTC) with ±14m jitter
+    const nextScheduledIsoTimestamp = metadata.publishAt || calculateNextOptimalPublishSlot();
+    console.log(`[YouTube] 📅 Scheduling publication for optimal slot: ${nextScheduledIsoTimestamp}`);
+
     try {
       const res = await youtube.videos.insert({
         part: 'snippet,status',
@@ -309,10 +319,11 @@ async function uploadToYouTube(filePath, metadata, onProgress) {
           snippet: {
             title: metadata.title.substring(0, 100),
             description: metadata.description || '',
-            categoryId: isGaming ? '20' : '22',
+            categoryId: categoryId,
           },
           status: {
-            privacyStatus: metadata.privacy || 'private',
+            privacyStatus: 'private',
+            publishAt: nextScheduledIsoTimestamp,
             selfDeclaredMadeForKids: false,
           },
         },
@@ -330,10 +341,37 @@ async function uploadToYouTube(filePath, metadata, onProgress) {
         },
       });
 
+      const videoId = res.data.id;
+
+      // Auto-post first comment (questionHook) to jumpstart viewer comment velocity
+      const questionHook = (metadata.questionHook || '').trim();
+      if (videoId && questionHook) {
+        try {
+          onProgress?.(`Auto-posting top question comment: "${questionHook}"...`);
+          await youtube.commentThreads.insert({
+            part: ['snippet'],
+            requestBody: {
+              snippet: {
+                videoId: videoId,
+                topLevelComment: {
+                  snippet: {
+                    textOriginal: questionHook,
+                  },
+                },
+              },
+            },
+          });
+          console.log(`[YouTube] 💬 Auto-posted first comment: "${questionHook}"`);
+        } catch (commentErr) {
+          console.warn(`[YouTube] ⚠️ Could not auto-post first comment (${commentErr.message}), continuing.`);
+        }
+      }
+
       return {
         videoId: res.data.id,
         url: `https://www.youtube.com/watch?v=${res.data.id}`,
         title: res.data.snippet?.title,
+        publishAt: nextScheduledIsoTimestamp,
       };
     } catch (err) {
       const msg = (err.message || '').toLowerCase();
@@ -403,6 +441,13 @@ app.get('/api/upload', async (req, res) => {
     return res.end();
   }
 
+  // Daily API Quota Budget Guard
+  const quotaStatus = isDailyQuotaReached();
+  if (quotaStatus.reached) {
+    sendEvent('error', { message: `🛑 Daily YouTube API upload quota limit reached (${quotaStatus.count}/${quotaStatus.limit} uploads today). Uploads will resume after midnight Pacific Time (PT).` });
+    return res.end();
+  }
+
   let downloadedFile = null;
 
   try {
@@ -432,14 +477,12 @@ app.get('/api/upload', async (req, res) => {
         );
         return {
           title: finalTitle || aiEnhanced.optimizedTitle,
-          description: finalDescription || aiEnhanced.optimizedDescription
+          description: finalDescription || aiEnhanced.optimizedDescription,
+          questionHook: aiEnhanced.questionHook || ''
         };
       } catch (err) {
         console.warn('AI enhancement fallback:', err.message);
-        return {
-          title: finalTitle || `${metadata.title} #Shorts #Gaming`,
-          description: finalDescription || metadata.description || metadata.title
-        };
+        throw err; // Never upload fallback strings when AI enhancement fails
       }
     })();
 
@@ -466,6 +509,7 @@ app.get('/api/upload', async (req, res) => {
     const uploadMetadata = {
       title: finalTitle.substring(0, 100),
       description: finalDescription,
+      questionHook: enhancedMeta.questionHook,
       privacy,
     };
 
@@ -482,12 +526,70 @@ app.get('/api/upload', async (req, res) => {
 
     sendEvent('progress', { message: `✅ AI Quality Check passed: ${qualityResult.reason}` });
 
-    // Step 2b: Ensure Strict 9:16 Vertical Shorts Format (Duration <= 60s) — only for verified clips
-    sendEvent('progress', { message: '🎨 Verifying video format for YouTube Shorts (9:16 vertical, <= 60s)...' });
-    const finalShortPath = await ensureShortsFormat(filePath, (fmtMsg) => {
+    let intermediateFile = filePath;
+
+    // Step 2b: Beat-Sync Phonk Audio Mixing (if enabled or default)
+    if (config.enableBeatSync !== false) {
+      try {
+        sendEvent('progress', { message: '🎵 Applying beat-sync Phonk mixing (100% music + 18% dialogue ducking)...' });
+        const beatResult = await createBeatSyncedShort(intermediateFile, {}, (msg) => sendEvent('progress', { message: msg }));
+        if (beatResult?.outputPath && fs.existsSync(beatResult.outputPath)) {
+          intermediateFile = beatResult.outputPath;
+          downloadedFile = intermediateFile;
+          sendEvent('progress', { message: `✅ Beat-sync complete with track: "${beatResult.songName}"` });
+        }
+      } catch (beatErr) {
+        console.warn('[Server] ⚠️ Beat sync error, continuing with original audio:', beatErr.message);
+        sendEvent('progress', { message: `⚠️ Beat-sync skipped: ${beatErr.message}` });
+      }
+    }
+
+    // Step 2c: Ensure Strict 9:16 Vertical Shorts Format (Duration <= 59.5s, -14 LUFS, Seamless Loop)
+    sendEvent('progress', { message: '🎨 Verifying video format for YouTube Shorts (9:16 vertical, <= 59.5s, -14 LUFS)...' });
+    const finalShortPath = await ensureShortsFormat(intermediateFile, (fmtMsg) => {
       sendEvent('progress', { message: fmtMsg });
-    });
+    }, { enableEndCard: config.enableEndCard === true });
     downloadedFile = finalShortPath;
+
+    // Step 2d: Apply 0-2.5s Dynamic Visual Hook Banner (Upper-third safe zone)
+    if (config.enableVisualHook !== false) {
+      try {
+        const hookText = enhancedMeta.visualHook || generateHookText({
+          title: uploadMetadata.title,
+          character: enhancedMeta.character,
+          franchise: enhancedMeta.franchise
+        });
+        sendEvent('progress', { message: `⚡ Applying 0-2.5s visual hook banner: "${hookText}"...` });
+        await applyVisualHookInPlace(finalShortPath, {
+          text: hookText,
+          duration: 2.5,
+          yPosition: 0.16
+        }, (hkMsg) => sendEvent('progress', { message: hkMsg }));
+        sendEvent('progress', { message: `✅ Visual hook applied: "${hookText}"` });
+      } catch (hookErr) {
+        console.warn('[Server] ⚠️ Visual hook failed (continuing without):', hookErr.message);
+      }
+    }
+
+    // Step 2e: Apply animated channel watermark overlay (Lower-mid safe zone: y=0.60)
+    const watermarkText = process.env.WATERMARK_TEXT || config.watermarkText;
+    if (watermarkText) {
+      try {
+        sendEvent('progress', { message: `🏷️ Applying animated watermark: "${watermarkText.toUpperCase()}"...` });
+        await applyWatermarkInPlace(finalShortPath, {
+          text: watermarkText,
+          startTime: parseFloat(process.env.WATERMARK_START_TIME) || 1.0,
+          opacity: parseFloat(process.env.WATERMARK_OPACITY) || 0.62,
+          yPosition: parseFloat(process.env.WATERMARK_Y_POSITION) || 0.60,
+        }, (wmMsg) => {
+          sendEvent('progress', { message: wmMsg });
+        });
+        sendEvent('progress', { message: `✅ Watermark applied: "${watermarkText.toUpperCase()}"` });
+      } catch (wmErr) {
+        console.warn('[Server] ⚠️ Watermark failed (continuing without):', wmErr.message);
+        sendEvent('progress', { message: `⚠️ Watermark could not be applied: ${wmErr.message}` });
+      }
+    }
 
     // Step 3: Upload to YouTube
     const result = await uploadToYouTube(finalShortPath, uploadMetadata, (msg) => {
