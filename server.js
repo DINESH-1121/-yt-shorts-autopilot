@@ -9,13 +9,13 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ── Auto-Pilot Modules ──────────────────────────────────────────────────
-const { getConfig, saveConfig, getHistory, isAlreadyUploaded, addToHistory } = require('./lib/store');
+const { getConfig, saveConfig, getHistory, isAlreadyUploaded, addToHistory, invalidateConfigCache } = require('./lib/store');
 const { runAutoPilotCycle, setupScheduler, getRecentLogs, isBusy, clearCandidatePool } = require('./lib/autopilot');
 const { rewriteSingleVideoMetadata, normalizeModelName } = require('./lib/aiEngine');
 const { listFreeModels } = require('./lib/aiClient');
 const { getScheduleInfo, buildCronFromCadence } = require('./lib/cadence');
 const { ensureShortsFormat } = require('./lib/shortsFormatter');
-const { authArgs, describeError } = require('./lib/ytdlp');
+const { authArgs, resetAuthArgsCache, describeError } = require('./lib/ytdlp');
 const { checkVideoQuality, heuristicQualityCheck } = require('./lib/qualityChecker');
 
 // ── Directories ──────────────────────────────────────────────────────────
@@ -415,25 +415,53 @@ app.get('/api/upload', async (req, res) => {
 
     let finalTitle = title ? title.trim() : '';
     let finalDescription = description ? description.trim() : '';
+    const config = getConfig();
 
-    // If user did not manually supply both title and description, use AI Pro to generate them with 25-30 hashtags
-    if (!finalTitle || !finalDescription) {
-      sendEvent('progress', { message: '🧠 AI Pro rewriting viral title & generating 25-30 hashtags...' });
-      const config = getConfig();
+    // Step 2: Run AI Metadata Generation & AI Quality Check concurrently
+    sendEvent('progress', { message: '⚡ Running AI Title/Description Optimization & AI Quality Check in parallel...' });
+
+    const metadataPromise = (async () => {
+      if (finalTitle && finalDescription) {
+        return { title: finalTitle, description: finalDescription };
+      }
       try {
         const aiEnhanced = await rewriteSingleVideoMetadata(
           metadata,
           null, // gateway needs no API key; free-model chain includes automatic fallbacks
           normalizeModelName(config.geminiModel || 'opencode/glm-5.3-flash-free')
         );
-        if (!finalTitle) finalTitle = aiEnhanced.optimizedTitle;
-        if (!finalDescription) finalDescription = aiEnhanced.optimizedDescription;
+        return {
+          title: finalTitle || aiEnhanced.optimizedTitle,
+          description: finalDescription || aiEnhanced.optimizedDescription
+        };
       } catch (err) {
         console.warn('AI enhancement fallback:', err.message);
-        if (!finalTitle) finalTitle = `${metadata.title} #Shorts #Gaming`;
-        if (!finalDescription) finalDescription = metadata.description || metadata.title;
+        return {
+          title: finalTitle || `${metadata.title} #Shorts #Gaming`,
+          description: finalDescription || metadata.description || metadata.title
+        };
       }
-    }
+    })();
+
+    const qualityPromise = (async () => {
+      const modelToUse = normalizeModelName(config.geminiModel || 'opencode/nemotron-3.5-super-vl-free');
+      return await checkVideoQuality({
+        videoPath: filePath,
+        metadata: {
+          title: finalTitle || metadata.title,
+          originalTitle: metadata.title,
+          description: finalDescription || metadata.description,
+          originalDescription: metadata.description,
+          uploader: metadata.uploader
+        },
+        model: modelToUse,
+        onProgress: (qcMsg) => sendEvent('progress', { message: qcMsg })
+      });
+    })();
+
+    const [enhancedMeta, qualityResult] = await Promise.all([metadataPromise, qualityPromise]);
+    finalTitle = enhancedMeta.title;
+    finalDescription = enhancedMeta.description;
 
     const uploadMetadata = {
       title: finalTitle.substring(0, 100),
@@ -442,23 +470,6 @@ app.get('/api/upload', async (req, res) => {
     };
 
     sendEvent('progress', { message: `Optimized Title: "${uploadMetadata.title}"` });
-
-    // Step 2: Pre-Upload AI Quality Check (evaluating AI slop & on-screen channel watermarks BEFORE transcoding)
-    sendEvent('progress', { message: '🛡️ Running AI Quality Check (evaluating AI slop & on-screen channel watermarks with OpenCode)...' });
-    const config = getConfig();
-    const modelToUse = normalizeModelName(config.geminiModel || 'opencode/nemotron-3.5-super-vl-free');
-    const qualityResult = await checkVideoQuality({
-      videoPath: filePath,
-      metadata: {
-        title: finalTitle,
-        originalTitle: metadata.title,
-        description: finalDescription,
-        originalDescription: metadata.description,
-        uploader: metadata.uploader
-      },
-      model: modelToUse,
-      onProgress: (qcMsg) => sendEvent('progress', { message: qcMsg })
-    });
 
     if (qualityResult.decision === 'REJECT') {
       console.warn('[Server] Manual upload rejected by AI Quality Check:', qualityResult.reason);
@@ -544,6 +555,8 @@ app.get('/api/ai/models', async (req, res) => {
 app.get('/api/autopilot/config', (req, res) => {
   // Reload .env so manual edits in .env are picked up immediately
   require('dotenv').config({ override: true });
+  invalidateConfigCache();
+  resetAuthArgsCache();
   const config = getConfig();
   const scheduleInfo = getScheduleInfo(config.schedule, config);
   res.json({
@@ -595,6 +608,8 @@ app.get('/api/autopilot/logs', (req, res) => {
 // Run Auto-Pilot cycle on demand with live SSE streaming
 app.get('/api/autopilot/run', (req, res) => {
   require('dotenv').config({ override: true });
+  invalidateConfigCache();
+  resetAuthArgsCache();
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -634,6 +649,8 @@ app.post('/api/ai/preview-metadata', async (req, res) => {
   }
 
   require('dotenv').config({ override: true });
+  invalidateConfigCache();
+  resetAuthArgsCache();
 
   const metaArgs = [
     '--no-warnings',
@@ -748,26 +765,30 @@ app.post('/api/quality/check', async (req, res) => {
 });
 
 // ── Start Server ─────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`
 ╔════════════════════════════════════════════════╗
 ║   YouTube Shorts Uploader                      ║
 ║   Running at: http://localhost:${PORT}            ║
 ╚════════════════════════════════════════════════╝
   `);
 
-  if (!process.env.CLIENT_ID || process.env.CLIENT_ID === 'your_client_id_here') {
-    console.log('⚠️  No OAuth credentials found!');
-    console.log('   Copy .env.example to .env and fill in your CLIENT_ID and CLIENT_SECRET');
-    console.log('   Get them from: https://console.cloud.google.com/apis/credentials\n');
-  }
+    if (!process.env.CLIENT_ID || process.env.CLIENT_ID === 'your_client_id_here') {
+      console.log('⚠️  No OAuth credentials found!');
+      console.log('   Copy .env.example to .env and fill in your CLIENT_ID and CLIENT_SECRET');
+      console.log('   Get them from: https://console.cloud.google.com/apis/credentials\n');
+    }
 
-  // Initialize Auto-Pilot scheduler
-  setupScheduler({
-    ytDlpPath: YT_DLP,
-    downloadFn: downloadVideo,
-    uploadFn: uploadToYouTube,
-    oauth2Client
+    // Initialize Auto-Pilot scheduler
+    setupScheduler({
+      ytDlpPath: YT_DLP,
+      downloadFn: downloadVideo,
+      uploadFn: uploadToYouTube,
+      oauth2Client
+    });
   });
-});
+}
+
+module.exports = { app, oauth2Client };
 
