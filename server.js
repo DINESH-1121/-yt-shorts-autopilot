@@ -177,7 +177,7 @@ function downloadVideo(url, onProgress, existingMetadata = null) {
         '--match-filter', '!is_live & !was_live & live_status =? "not_live"',
         '--max-filesize', '250M', // Protect against runaway live recordings or full movies
         '-f', 'bv*[height<=1080]+ba/b[height<=1080]/bv*+ba/b',
-        '--format-sort', 'res:1080,fps:60,br,size',
+        '--format-sort', 'res:1080,fps:60,vcodec:h264,br,size',
         '--merge-output-format', 'mp4',
         '-o', outputTemplate,
         url,
