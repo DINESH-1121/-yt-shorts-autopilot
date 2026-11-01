@@ -337,7 +337,7 @@ async function refreshModelList() {
 // ── Dynamic Cadence Studio State & Logic ─────────────────────────────────
 
 let currentCadence = {
-  mode: 'interval',
+  mode: 'immediate',
   preset: 'every-2h',
   intervalValue: 2,
   intervalUnit: 'hours',
@@ -559,6 +559,16 @@ function updateCadenceUIElements(info) {
   const countdownBadge = document.getElementById('cadence-countdown-badge');
   const statusPillText = document.getElementById('cadence-next-countdown');
 
+  if (currentCadence.mode === 'immediate' || info.cron === 'immediate') {
+    if (lbl) lbl.textContent = '⚡ Immediate Continuous (No hard time set)';
+    if (cronEl) cronEl.textContent = 'immediate';
+    if (nextTime) nextTime.textContent = 'Immediate (Continuous)';
+    if (countdownBadge) countdownBadge.textContent = '⚡ Immediate (Active)';
+    if (statusPillText) statusPillText.textContent = 'Upload: ⚡ Immediate (No delay)';
+    nextScheduledRunDate = null;
+    return;
+  }
+
   if (lbl) lbl.textContent = info.label;
   if (cronEl) cronEl.textContent = info.cron;
   if (nextTime) nextTime.textContent = info.nextRunFormatted || 'None scheduled';
@@ -573,6 +583,13 @@ function updateCadenceUIElements(info) {
 function startCountdownTicker() {
   if (countdownIntervalTimer) clearInterval(countdownIntervalTimer);
   countdownIntervalTimer = setInterval(() => {
+    if (currentCadence.mode === 'immediate') {
+      const countdownBadge = document.getElementById('cadence-countdown-badge');
+      const statusPillText = document.getElementById('cadence-next-countdown');
+      if (countdownBadge) countdownBadge.textContent = '⚡ Immediate (Active)';
+      if (statusPillText) statusPillText.textContent = 'Upload: ⚡ Immediate (No delay)';
+      return;
+    }
     if (!nextScheduledRunDate) return;
     const now = new Date();
     const diffMs = nextScheduledRunDate.getTime() - now.getTime();
@@ -645,7 +662,7 @@ async function loadAutoPilotConfig() {
     }
 
     // Restore mode
-    selectCadenceMode(currentCadence.mode || 'interval');
+    selectCadenceMode(currentCadence.mode || 'immediate');
 
     // Populate Interval controls
     const intVal = document.getElementById('cadence-interval-val');
