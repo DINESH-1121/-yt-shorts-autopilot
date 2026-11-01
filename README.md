@@ -1,6 +1,6 @@
 # YouTube Shorts Studio & Autonomous AI Auto-Pilot
 
-An enterprise-grade, fully autonomous YouTube Shorts curation, formatting, and publishing suite powered by **local Apple Silicon MLX GPU acceleration**, **Google Gemini Pro fallback**, **Apple VideoToolbox hardware transcoding**, and a **Strict Anti-Repetition Duplicate Prevention Engine**.
+An enterprise-grade, fully autonomous YouTube Shorts curation, formatting, and publishing suite powered by **local Apple Silicon MLX GPU acceleration**, **Beat-Sync Phonk audio mixing**, **Dynamic Visual Hooks**, **Google Font Pirata One animated watermarking**, **Apple VideoToolbox hardware transcoding**, and a **Strict Anti-Repetition Duplicate Prevention Engine**.
 
 ---
 
@@ -11,52 +11,75 @@ An enterprise-grade, fully autonomous YouTube Shorts curation, formatting, and p
   * Native multimodal AI: handles both visual keyframe quality checks and high-CTR title & description generation.
   * Generates high-CTR viral titles and rich SEO descriptions at high throughput with **zero external rate limits, zero quotas, and zero API costs**.
   * Built-in automatic background lifecycle manager (`ensureMLXServer`) that spins up the local OpenAI-compatible HTTP daemon on demand.
+  * Cloud fallback to **Google Gemini** (`gemini-3.8-flash`) if MLX is unavailable.
+* **🎵 Beat-Sync Phonk Audio & Dialogue Ducking Pipeline**:
+  * Automatically mixes Brazilian Phonk and high-energy drift phonk (e.g., `MONTAGEM ALQUIMIA`) with raw video audio.
+  * **Intelligent Dialogue Ducking**: Prioritizes dialogue and punchy sound effects at 18% ducking volume while keeping phonk bass lines at full 100% prominence.
+  * **EBU R128 Loudness Normalization**: Automatically normalizes audio to **-14 LUFS** with a **-1.0 dBFS true peak ceiling**, preventing audio clipping, distortion, or quiet playback on mobile devices.
+* **⚡ Dynamic Visual Hook Engine (0.0s – 2.5s)**:
+  * Renders an attention-grabbing frosted-glass hook banner in the upper third safe zone (`y = 0.16`), completely clear of the YouTube Shorts UI header.
+  * Formulates curiosity-inducing, emotional hook titles (e.g. *"The Shadow Monarch Awakens 💀"*) to arrest viewer attention in the first 3 seconds, pushing viewer hold rates well above 80%.
+* **🏷️ Viral Watermark Overlay with Google Font Pirata One**:
+  * Exact replica of the viral YouTube Short format (e.g., [`https://www.youtube.com/shorts/cBqrI_M4h6s`](https://www.youtube.com/shorts/cBqrI_M4h6s)).
+  * **Stacked Typography**: Crisp, tracked uppercase sans-serif (`MADE BY`) paired with viral gothic blackletter typography in Google Font **Pirata One** (`assets/fonts/PirataOne-Regular.ttf`).
+  * **Organically Floating**: Text floats directly on the footage with ambient dark drop shadows (`rgba(0,0,0,0.95)`, blur: `8px`)—no bulky rounded background pill boxes.
+  * **Smooth 3-Phase Cursor Animation**:
+    * **Phase 1 (Reveal In, 0.6s)**: A glowing vertical white cursor bar (`3px` wide, white glow) slides left-to-right (`easeOutCubic`), unmasking text smoothly.
+    * **Phase 2 (Hold, 3.0s)**: Full text remains visible; cursor blinks softly on hold then gracefully fades out.
+    * **Phase 3 (Wipe Out, 0.5s)**: Cursor bar slides back right-to-left (`easeInCubic`), cleanly wiping the text away.
+  * Positioned in the lower-third safe zone (`y = 0.82`) above YouTube title and action buttons.
+* **🔁 Seamless Looping Mode (>100% APV Retention)**:
+  * End cards are disabled by default (`enableEndCard: false`) to ensure uninterrupted, seamless loop transitions.
+  * Infinite loops incentivize repeat views, driving Average Percentage Viewed (APV) well over 100%—a critical algorithmic signal for Shorts feed recommendation velocity.
 * **🚫 Strict Anti-Repetition Duplicate Prevention**:
   * Multi-layer canonical ID extraction engine supporting YouTube Shorts (`/shorts/`), regular videos (`/watch?v=`), short links (`youtu.be/`), and Instagram Reels (`/reel/`).
-  * **Zero Double Downloads**: Pre-filters duplicate videos at 4 independent stages: scanner intake, candidate queueing, pre-download validation, and manual upload submission.
-  * High-capacity persistent tracking (`history.json`) preserving canonical IDs and URLs permanently across thousands of uploads.
-* **📝 Rich Video Descriptions with 25–30 Guaranteed Hashtags**:
-  * Automatically extracts original context and narrative hooks to describe what actually happens in the video.
-  * Formats high-conversion Calls to Action (Like, Comment, Subscribe) without external links or promotional clutter, maximizing viewer retention and YouTube recommendation velocity.
-  * **Anti-Hallucination Genre Guard**: Rigorously aligns hashtags with the true content category (Anime, Gaming, Cinema, Tech) to prevent cross-genre tag leakage.
-  * Dynamically populates and deduplicates **exactly 25 to 30 relevant, high-velocity hashtags** spanning niche-specific tags and universal Shorts viral tags.
-* **🎯 Target Content Mix & Automatic Deficit Balancing**:
-  * Define exact percentage targets for your channels and queries (e.g., 25% Anime, 25% Marvel, 25% Gaming, 25% Tech).
-  * AutoPilot computes historical upload deficits from `history.json` and automatically prioritizes under-represented categories to maintain the exact desired channel distribution.
+  * **Zero Double Downloads**: Pre-filters duplicate videos across 4 independent gates: scanner intake, candidate queueing, pre-download validation, and manual upload submission.
+  * Persistent tracking (`history.json`) permanently retains canonical IDs across thousands of uploads.
+* **📊 Algorithmic Cadence & Daily Quota Guard**:
+  * Enforces an optimal posting cadence of **3–4 Shorts per day**, spacing uploads evenly across peak viewer traffic windows.
+  * Built-in daily quota tracking in `lib/store.js` prevents excessive bursts that could trigger spam flags or algorithmic shadowbans.
+  * Scanner sweet-spot filter (`12s–58s`) automatically skips clips that are too short to hook or exceed YouTube's 60s Shorts threshold.
 * **🛡️ Dual-Rule AI Quality & Safety Guard**:
   * **Rule 1 (AI Slop Detection)**: Rejects 100% synthetic hallucinations (Sora, Runway, Kling, Pika loops) and low-effort robotic brainrot, while approving authentic gameplay, cinema edits, and anime clips.
-  * **Rule 2 (Promo Watermark Rejection)**: Rejects on-screen burnt-in promos, watermarks, or overlays directing viewers to rival YouTube channels. Title and description mentions of celebrities and actors are 100% exempt.
+  * **Rule 2 (Promo Watermark Rejection)**: Rejects on-screen burnt-in promos, watermarks, or overlays directing viewers to rival channels. Title and description mentions of celebrities and actors are 100% exempt.
   * **Pre-Transcode Gate**: Evaluates raw video frames *before* transcoding, saving disk I/O and compute on rejected videos.
 * **🚀 Hardware-Accelerated 9:16 Vertical Transcoding**:
   * Utilizes Apple's dedicated hardware Media Engine via `h264_videotoolbox` on macOS.
-  * Converts horizontal clips to 9:16 vertical format (1080x1920 $\le 59.5$s) with blurred ambient backgrounds in **1–2 seconds** at master quality (18–24 Mbps).
+  * Converts clips to 9:16 vertical format (1080x1920) with blurred ambient backgrounds in **1–2 seconds** with color grading and 1.03x speed shift for perceptual hash evasion.
 * **🌐 Web Dashboard & Real-Time Monitoring**:
-  * Sleek dark-mode Studio dashboard with live Server-Sent Events (SSE) streaming real-time download, AI reasoning, transcoding, and upload progress.
+  * Sleek dark-mode Studio dashboard with live Server-Sent Events (SSE) streaming real-time download, AI reasoning, audio mixing, and upload progress.
 
 ---
 
 ## 🏗️ Architecture & Pipeline Flow
 
 ```
-┌─────────────────┐       ┌──────────────────────┐       ┌──────────────────────┐
-│  Multi-Source   ├──────►│  Canonical Duplicate ├──────►│  Candidate Queue     │
-│  Intake Scanner │       │  Prevention Engine   │       │  & Deficit Balancing │
-└─────────────────┘       └──────────────────────┘       └──────────┬───────────┘
-                                                                    │
-                                                                    ▼
-┌─────────────────┐       ┌──────────────────────┐       ┌──────────────────────┐
-│ YouTube Data v3 │◄──────┤ Apple VideoToolbox   │◄──────┤ Pre-Upload AI        │
-│ API Publisher   │       │ 9:16 Hardware Encode │       │ Quality Guard        │
-└─────────────────┘       └──────────────────────┘       └──────────────────────┘
+┌──────────────────┐       ┌──────────────────────┐       ┌──────────────────────┐
+│  Multi-Source    ├──────►│  Canonical Duplicate ├──────►│  Duration Sweet-Spot  │
+│  Intake Scanner  │       │  Prevention Engine   │       │  Filter (12s–58s)    │
+└──────────────────┘       └──────────────────────┘       └──────────┬───────────┘
+                                                                     │
+                                                                     ▼
+┌──────────────────┐       ┌──────────────────────┐       ┌──────────────────────┐
+│  Hardware 9:16   │◄──────┤  Beat-Sync Phonk     │◄──────┤  Pre-Transcode AI    │
+│  Encode + EBU-R  │       │  Dialogue Ducking    │       │  Quality Guard (MLX) │
+└────────┬─────────┘       └──────────────────────┘       └──────────────────────┘
+         │
+         ▼
+┌──────────────────┐       ┌──────────────────────┐       ┌──────────────────────┐
+│  Dynamic Visual  ├──────►│  Animated Pirata One ├──────►│  YouTube Data v3 API │
+│  Hook (0–2.5s)   │       │  Watermark (y=0.82)  │       │  Publisher + Quota   │
+└──────────────────┘       └──────────────────────┘       └──────────────────────┘
 ```
 
-1. **Source Discovery**: Ingests candidate shorts via configured keywords, channel handles, and dynamic trending search pools.
+1. **Source Discovery**: Ingests candidate shorts via configured keywords, channel handles, and dynamic trending search pools, filtered strictly within the 12s–58s sweet spot.
 2. **Duplicate Filtering**: Canonical 11-character video IDs are checked against `history.json`. Any previously downloaded or uploaded video is immediately discarded.
-3. **AI Selection & SEO Formulation**: The local Apple Silicon MLX GPU evaluates candidate options against content distribution percentages, crafting a click-worthy title, rich description, and 25–30 hashtags.
-4. **Primacy Download**: Downloads master video streams via `yt-dlp` using cookie authentication to bypass bot protections.
-5. **Quality Verification**: Extracts 3 representative video keyframes and verifies compliance against slop and competitor promos.
-6. **Hardware Transcoding**: FFmpeg with `h264_videotoolbox` transcodes the video to vertical 9:16 Short format in under 2 seconds.
-7. **YouTube Upload**: Streams video to YouTube API v3 with real-time percentage progress, records canonical ID in history, and clears temporary files.
+3. **AI Quality Verification**: Evaluates raw video keyframes against slop and competitor promos *prior* to expensive rendering steps.
+4. **Beat-Sync Phonk Mixing**: Generates punchy Brazilian Phonk backing tracks with 18% dialogue ducking and BPM beat alignment.
+5. **Hardware Transcoding & Hash Evasion**: Transcodes to 9:16 vertical format with ambient blur, color shift, 1.03x speed shift, and EBU R128 (-14 LUFS) loudness normalization in seamless looping mode.
+6. **Dynamic Visual Hook**: Overlays a frosted-glass visual hook banner during 0.0s–2.5s in the upper third (`y=0.16`).
+7. **Animated Pirata One Watermark**: Renders a glowing cursor-reveal and wipe watermark overlay featuring `Pirata One` gothic typography at `y=0.82`.
+8. **Publishing & Quota Tracking**: Streams the finalized Short to YouTube API v3 with optimized titles and 25–30 niche hashtags, updating the daily quota tracker (3–4 shorts/day limit).
 
 ---
 
@@ -67,9 +90,8 @@ The AI gateway ([`lib/aiClient.js`](lib/aiClient.js)) connects directly to Apple
 * **Default Local Model**: [`mlx-community/Qwen3.5-9B-MLX-4bit`](https://huggingface.co/mlx-community/Qwen3.5-9B-MLX-4bit) (~5.6 GB memory footprint).
 * **High-Performance Intelligence**: Qwen 3.5 9B on Metal GPU for rapid viral metadata generation and visual content compliance.
 * **Instant Structured JSON**: Automatically configures `enable_thinking: false` in the MLX chat template, producing direct JSON without reasoning token latency.
-* **Multimodal Vision Readiness**: Architecture prepared with `mlx-vlm` support for local vision-language model keyframe inspection.
 * **Automated Daemon**: Node automatically launches the server on port `8080` if not already running.
-* **Cloud Fallback**: Automatically cascades to Google Gemini (`gemini-3.8-flash` with 1,500 req/day quota) if MLX is unreachable or explicitly disabled.
+* **Cloud Fallback**: Automatically cascades to Google Gemini (`gemini-3.8-flash`) if MLX is unreachable or explicitly disabled.
 
 ### Useful MLX Commands
 ```bash
@@ -81,44 +103,36 @@ npm run mlx:chat
 
 # Or directly with Python:
 .venv-mlx/bin/python -m mlx_lm chat --model mlx-community/Qwen3.5-9B-MLX-4bit
-
-# Run quick one-off generation:
-.venv-mlx/bin/python -m mlx_lm generate --model mlx-community/Qwen3.5-9B-MLX-4bit --prompt "Write 3 viral short titles for GTA 6"
 ```
 
 ---
 
-## 🚫 Anti-Repetition & Duplicate Prevention
+## 🧪 Testing & Validation Suite
 
-To guarantee your YouTube channel never uploads the same video twice:
+The project includes unit tests and a local end-to-end validation short generator:
 
-* **Canonical Normalization**: Standardizes URLs across all variations:
-  * `https://youtube.com/shorts/DManF7dWTJM` ➔ `DManF7dWTJM`
-  * `https://www.youtube.com/watch?v=DManF7dWTJM` ➔ `DManF7dWTJM`
-  * `https://youtu.be/DManF7dWTJM` ➔ `DManF7dWTJM`
-  * `https://instagram.com/reel/C-xyz123/` ➔ `C-xyz123`
-* **4-Gate Enforcement**:
-  1. **Scanner Intake Gate**: Skips known videos before candidate extraction completes.
-  2. **AutoPilot Pool Gate**: Filters remaining candidates before sending prompts to the AI.
-  3. **Pre-Download Gate**: Validates the winning video's canonical ID right before triggering network download.
-  4. **Manual Upload Gate**: Rejects duplicate URLs pasted into the single-video upload form.
-* **Persistent History**: `history.json` retains up to 5,000 processed videos (both uploaded and permanently rejected), preventing duplicates across days, weeks, and months.
+```bash
+# 1. Test Animated Watermark (Pirata One, cursor reveal, hold, wipe, buffer sizes):
+node test-watermark.js
 
----
+# 2. Test Dynamic Visual Hook Banner:
+node test-visual-hook.js
 
-## 📝 Video Descriptions & 25–30 Hashtags Engine
+# 3. Test Beat-Sync Phonk Pipeline & Dialogue Ducking:
+node test-beat-sync-pipeline.js
 
-Every generated video description adheres to a strict SEO formula:
+# 4. Test AI Quality & Slop Checker:
+node test-quality-checker.js
 
-1. **Context-Aware Summary**: 2–3 engaging sentences explaining the specific highlight, gameplay clutch, or scene.
-2. **Call to Action (CTA)**: Encourages engagement (`Drop a like if you enjoyed this, share your thoughts in the comments, and don't forget to subscribe for more daily shorts!`).
-3. **Anti-Hallucination Genre Guard**: Filters and locks hashtags strictly to the detected genre (Anime, Gaming, Marvel/Cinema, Tech), preventing cross-genre contamination (e.g. no gaming hashtags on movie edits).
-4. **Hashtag Bank (Guaranteed 25–30 Tags)**:
-   * **Anime**: `#shorts #anime #animedit #jujutsukaisen #demonslayer #naruto #onepiece #otaku #animefight #amv ...`
-   * **Gaming**: `#shorts #gaming #minecraft #gta6 #eldenring #valorant #clutch #gamers #gameplay #nextgen ...`
-   * **Marvel / Film**: `#shorts #marvel #avengers #mcu #doomsday #cinema #cinematography #hollywood #filmtok ...`
-   * **Tech / Innovation**: `#shorts #technology #tech #innovation #gadgets #ai #robotics #futuretech #smartdevices ...`
-   * **Viral Velocity**: `#shorts #viral #trending #fyp #foryou #viralshorts #trendingshorts #explore #reels ...`
+# 5. Test 9:16 Shorts Formatter & End Card Engine:
+node test-endcard-formatter.js
+
+# 6. Generate a full 10-second validation sample Short (NO YouTube upload):
+node scripts/generate_sample_validation_short.js 10
+```
+
+> [!NOTE]
+> `scripts/generate_sample_validation_short.js` runs the entire production pipeline (beat-sync phonk, EBU R128 normalization, visual hook banner, and cursor-reveal watermark) and outputs a sample video to [`downloads/validation_sample_short.mp4`](downloads/validation_sample_short.mp4) without uploading to YouTube.
 
 ---
 
@@ -129,7 +143,7 @@ Every generated video description adheres to a strict SEO formula:
 * **Python**: 3.10+ (Homebrew Python 3.12 recommended)
 * **System Binaries**:
   ```bash
-  brew install ffmpeg yt-dlp
+  brew install ffmpeg yt-dlp pkg-config cairo pango libpng jpeg giflib librsvg
   ```
 
 ---
@@ -138,8 +152,8 @@ Every generated video description adheres to a strict SEO formula:
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/DINESH-1121/yt-shorts-uploader.git
-cd yt-shorts-uploader
+git clone https://github.com/DINESH-1121/-yt-shorts-autopilot.git
+cd -yt-shorts-autopilot
 ```
 
 ### 2. Install Node Dependencies
@@ -152,8 +166,8 @@ npm install
 # Create dedicated Python virtual environment:
 /opt/homebrew/bin/python3.12 -m venv .venv-mlx
 
-# Install Apple Silicon Metal MLX packages (including Vision-Language support):
-.venv-mlx/bin/pip install mlx mlx-lm mlx-vlm
+# Install Apple Silicon Metal MLX packages:
+.venv-mlx/bin/pip install mlx mlx-lm mlx-vlm scipy numpy
 ```
 
 ### 4. Configure Environment Variables
@@ -181,17 +195,23 @@ GEMINI_MODEL=gemini-3.8-flash
 DISABLE_OPENCODE=true
 
 # YouTube Bot Bypass & Cookie Authentication
-# Place a Netscape-formatted cookies.txt in the project root:
 YTDLP_COOKIES=cookies.txt
-# Alternatively, read cookies directly from your browser:
-# YTDLP_COOKIES_FROM_BROWSER=chrome
+# Alternatively: YTDLP_COOKIES_FROM_BROWSER=chrome
+
+# Animated Watermark Overlay (Viral Pirata One Style)
+WATERMARK_TEXT=MADE BY @YOURCHANNEL
+WATERMARK_START_TIME=1.0
+WATERMARK_OPACITY=0.95
+WATERMARK_Y_POSITION=0.82
+
+# End Card Configuration (disabled by default for seamless looping)
+ENABLE_END_CARD=false
+ENDCARD_PATH=assets/End Cards Shorts.mp4
 ```
 
 > [!TIP]
 > **Bypassing YouTube "Sign in to confirm you're not a bot" checks**:
-> YouTube actively blocks anonymous video downloads. To ensure smooth automated downloads:
-> 1. Export your logged-in YouTube session cookies using a browser extension (such as *Get cookies.txt LOCALLY*) and save it as `cookies.txt` in the root folder.
-> 2. Alternatively, set `YTDLP_COOKIES_FROM_BROWSER=chrome` in `.env`. If using macOS, grant **Full Disk Access** to your Terminal / IDE in *System Settings ➔ Privacy & Security* so Node can read Chrome's cookie database.
+> Export your logged-in YouTube session cookies using a browser extension (such as *Get cookies.txt LOCALLY*) and save it as `cookies.txt` in the root folder, or set `YTDLP_COOKIES_FROM_BROWSER=chrome` in `.env`.
 
 ### 5. Set Up Google Cloud OAuth
 1. Visit the [Google Cloud Console](https://console.cloud.google.com/) and create a project.
@@ -228,36 +248,26 @@ npm run dev
   "privacy": "public",
   "cadence": {
     "mode": "interval",
-    "intervalValue": 30,
+    "intervalValue": 360,
     "intervalUnit": "minutes"
   },
   "sources": [
     {
       "type": "keyword",
-      "url": "Anime",
+      "url": "Anime edits 4k 60fps shorts",
       "name": "Anime Highlights",
-      "percentage": 25
+      "percentage": 50
     },
     {
       "type": "keyword",
-      "url": "Marvel Avengers Doomsday",
+      "url": "Marvel cinema edits shorts",
       "name": "Marvel & Cinema",
-      "percentage": 25
-    },
-    {
-      "type": "keyword",
-      "url": "insane viral gaming clips shorts",
-      "name": "Gaming Clutches",
-      "percentage": 25
-    },
-    {
-      "type": "keyword",
-      "url": "futuristic tech innovations gadgets shorts",
-      "name": "Tech & AI",
-      "percentage": 25
+      "percentage": 50
     }
   ],
-  "maxCandidates": 12
+  "maxCandidates": 12,
+  "watermarkText": "MADE BY @YOURCHANNEL",
+  "enableEndCard": false
 }
 ```
 
