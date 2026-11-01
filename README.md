@@ -35,8 +35,12 @@ An enterprise-grade, fully autonomous YouTube Shorts curation, formatting, and p
   * Multi-layer canonical ID extraction engine supporting YouTube Shorts (`/shorts/`), regular videos (`/watch?v=`), short links (`youtu.be/`), and Instagram Reels (`/reel/`).
   * **Zero Double Downloads**: Pre-filters duplicate videos across 4 independent gates: scanner intake, candidate queueing, pre-download validation, and manual upload submission.
   * Persistent tracking (`history.json`) permanently retains canonical IDs across thousands of uploads.
+* **📅 Strict 8-Hour Auto-Scheduling & Queue System**:
+  * **Zero Viewer Cannibalization**: Uploads are held safely in **Private** on YouTube servers and automatically scheduled to go **Public exactly 8 hours apart** from the previous video.
+  * **Batch-Proof Staggering**: If multiple shorts are downloaded in rapid succession (e.g., 5 videos in 5 minutes), the queue assigns sequential slots ($T + 8\text{h}$, $T + 16\text{h}$, $T + 24\text{h}$, etc.) with natural $\pm 2$ minute micro-jitter to prevent robotic timing signatures.
+  * **Offline Fire-and-Forget**: YouTube processes full 1080p encoding, auto-captions, and Content ID checks in advance; your local machine can power off immediately after upload while YouTube's cloud flips each video to Public on schedule.
 * **📊 Algorithmic Cadence & Daily Quota Guard**:
-  * Enforces an optimal posting cadence of **3–4 Shorts per day**, spacing uploads evenly across peak viewer traffic windows.
+  * Enforces an optimal posting cadence of **3 Shorts per day (every 8 hours)**, spacing uploads evenly across peak viewer traffic windows.
   * Built-in daily quota tracking in `lib/store.js` prevents excessive bursts that could trigger spam flags or algorithmic shadowbans.
   * Scanner sweet-spot filter (`12s–58s`) automatically skips clips that are too short to hook or exceed YouTube's 60s Shorts threshold.
 * **🛡️ Dual-Rule AI Quality & Safety Guard**:
@@ -79,7 +83,37 @@ An enterprise-grade, fully autonomous YouTube Shorts curation, formatting, and p
 5. **Hardware Transcoding & Hash Evasion**: Transcodes to 9:16 vertical format with ambient blur, color shift, 1.03x speed shift, and EBU R128 (-14 LUFS) loudness normalization in seamless looping mode.
 6. **Dynamic Visual Hook**: Overlays a frosted-glass visual hook banner during 0.0s–2.5s in the upper third (`y=0.16`).
 7. **Animated Pirata One Watermark**: Renders a glowing cursor-reveal and wipe watermark overlay featuring `Pirata One` gothic typography at `y=0.82`.
-8. **Publishing & Quota Tracking**: Streams the finalized Short to YouTube API v3 with optimized titles and 25–30 niche hashtags, updating the daily quota tracker (3–4 shorts/day limit).
+8. **Publishing & 8-Hour Auto-Schedule Queue**: Streams the finalized Short to YouTube API v3 with optimized titles and 25–30 niche hashtags, automatically assigning a `status.publishAt` slot spaced strictly 8 hours from the previous video while holding it in Private, updating the daily quota tracker (up to ~6 uploads/day limit).
+
+---
+
+## 📅 Strict 8-Hour Auto-Publishing Queue System
+
+The platform features an intelligent, automated release queue ([`lib/cadence.js`](lib/cadence.js)) designed to maximize algorithmic discovery without manual intervention:
+
+```
+[ Upload Video 1 ] ──► Uploaded to YouTube Immediately (Held as Private)
+                           │
+                           ▼ (+8 Hours)
+                       Scheduled to go Public: Today @ 6:00 PM
+                           │
+[ Upload Video 2 ] ──► Uploaded to YouTube Immediately (Held as Private)
+                           │
+                           ▼ (+8 Hours from Video 1)
+                       Scheduled to go Public: Tomorrow @ 2:00 AM
+                           │
+[ Upload Video 3 ] ──► Uploaded to YouTube Immediately (Held as Private)
+                           │
+                           ▼ (+8 Hours from Video 2)
+                       Scheduled to go Public: Tomorrow @ 10:00 AM
+```
+
+* **Why Upload Immediately & Publish Later?**
+  * **1080p Processing**: YouTube processes full-resolution HD/4K streams in the background before real viewers arrive, avoiding blurry 360p views.
+  * **Auto-Captions & Indexing**: Subtitles and audio transcripts are processed by YouTube's indexing bots while in Private, enhancing search and recommendation signals before the public launch.
+  * **Copyright & Content ID**: Background scans complete cleanly with zero viewer disruption.
+* **Batch Upload Safety**: If you paste and upload 5 videos in 5 minutes, all 5 upload immediately and are queued strictly 8 hours apart ($+8\text{h}$, $+16\text{h}$, $+24\text{h}$, $+32\text{h}$, $+40\text{h}$) with natural $\pm 2$ minute micro-jitter.
+* **Offline Operation**: YouTube's cloud servers handle the transition from Private to Public automatically; your Mac does not need to stay online.
 
 ---
 
@@ -245,11 +279,14 @@ npm run dev
 ```json
 {
   "enabled": true,
-  "privacy": "public",
+  "privacy": "scheduled",
+  "schedule": "0 */8 * * *",
+  "scheduleLabel": "Every 8 Hours (3x Daily)",
   "cadence": {
     "mode": "interval",
-    "intervalValue": 360,
-    "intervalUnit": "minutes"
+    "preset": "every-8h",
+    "intervalValue": 8,
+    "intervalUnit": "hours"
   },
   "sources": [
     {

@@ -1,4 +1,5 @@
-// Smoke test for/lib/aiClient.js — run with: node smoke-test-ai.js
+// Smoke test for lib/aiClient.js — run with: node smoke-test-ai.js
+require('dotenv').config();
 const aiClient = require('./lib/aiClient');
 
 (async () => {

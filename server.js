@@ -13,7 +13,7 @@ const { getConfig, saveConfig, getHistory, isAlreadyUploaded, addToHistory, inva
 const { runAutoPilotCycle, setupScheduler, getRecentLogs, isBusy, clearCandidatePool } = require('./lib/autopilot');
 const { rewriteSingleVideoMetadata, normalizeModelName } = require('./lib/aiEngine');
 const { listFreeModels } = require('./lib/aiClient');
-const { getScheduleInfo, buildCronFromCadence, calculateNextOptimalPublishSlot } = require('./lib/cadence');
+const { getScheduleInfo, buildCronFromCadence, calculateNextOptimalPublishSlot, getNextAutoScheduleSlot } = require('./lib/cadence');
 const { ensureShortsFormat } = require('./lib/shortsFormatter');
 const { applyWatermarkInPlace } = require('./lib/watermark');
 const { authArgs, resetAuthArgsCache, describeError } = require('./lib/ytdlp');
@@ -308,9 +308,21 @@ async function uploadToYouTube(filePath, metadata, onProgress) {
     const isGaming = /gta|game|gaming|gameplay|clutch|ps5|xbox|unreal|valorant|minecraft|cod|fortnite|wukong|esports/i.test(`${metadata.title} ${metadata.description || ''}`);
     const categoryId = isAnimeOrEdit ? '1' : (isGaming ? '20' : '1'); // Default '1' (Film & Animation) for Anime/Marvel edits
 
-    // Calculate next optimal publishing slot (18:00 IST / 12:30 UTC or 21:30 IST / 16:00 UTC) with ±14m jitter
-    const nextScheduledIsoTimestamp = metadata.publishAt || calculateNextOptimalPublishSlot();
-    console.log(`[YouTube] 📅 Scheduling publication for optimal slot: ${nextScheduledIsoTimestamp}`);
+    // Build publishing status respecting user's privacy selection (public, unlisted, private, or scheduled)
+    const statusObj = {
+      selfDeclaredMadeForKids: false
+    };
+
+    const requestedPrivacy = (metadata.privacy || 'scheduled').toLowerCase();
+    if (metadata.publishAt || requestedPrivacy === 'scheduled') {
+      const scheduledTime = metadata.publishAt || getNextAutoScheduleSlot({ history: getHistory() });
+      statusObj.privacyStatus = 'private';
+      statusObj.publishAt = scheduledTime;
+      console.log(`[YouTube] 📅 Auto-scheduling publication for: ${scheduledTime} (Held as Private on YouTube until release)`);
+    } else {
+      statusObj.privacyStatus = requestedPrivacy === 'public' ? 'public' : (requestedPrivacy === 'unlisted' ? 'unlisted' : 'private');
+      console.log(`[YouTube] 🚀 Publishing with privacy status: ${statusObj.privacyStatus}`);
+    }
 
     try {
       const res = await youtube.videos.insert({
@@ -321,11 +333,7 @@ async function uploadToYouTube(filePath, metadata, onProgress) {
             description: metadata.description || '',
             categoryId: categoryId,
           },
-          status: {
-            privacyStatus: 'private',
-            publishAt: nextScheduledIsoTimestamp,
-            selfDeclaredMadeForKids: false,
-          },
+          status: statusObj,
         },
         media: {
           body: fs.createReadStream(filePath),
@@ -371,7 +379,8 @@ async function uploadToYouTube(filePath, metadata, onProgress) {
         videoId: res.data.id,
         url: `https://www.youtube.com/watch?v=${res.data.id}`,
         title: res.data.snippet?.title,
-        publishAt: nextScheduledIsoTimestamp,
+        publishAt: statusObj.publishAt || null,
+        privacy: statusObj.privacyStatus
       };
     } catch (err) {
       const msg = (err.message || '').toLowerCase();
@@ -419,7 +428,8 @@ app.get('/api/upload', async (req, res) => {
   const url = req.query.url;
   const title = req.query.title;
   const description = req.query.description;
-  const privacy = req.query.privacy || 'private';
+  const privacy = req.query.privacy || 'scheduled';
+  const publishAt = req.query.publishAt || null;
 
   // Validate — send errors as SSE events
   if (!url) {
@@ -511,6 +521,7 @@ app.get('/api/upload', async (req, res) => {
       description: finalDescription,
       questionHook: enhancedMeta.questionHook,
       privacy,
+      publishAt,
     };
 
     sendEvent('progress', { message: `Optimized Title: "${uploadMetadata.title}"` });
@@ -571,7 +582,7 @@ app.get('/api/upload', async (req, res) => {
       }
     }
 
-    // Step 2e: Apply animated channel watermark overlay (Lower-mid safe zone: y=0.60)
+    // Step 2e: Apply animated channel watermark overlay (Lower-third viral safe zone: y=0.82)
     const watermarkText = process.env.WATERMARK_TEXT || config.watermarkText;
     if (watermarkText) {
       try {
@@ -579,8 +590,8 @@ app.get('/api/upload', async (req, res) => {
         await applyWatermarkInPlace(finalShortPath, {
           text: watermarkText,
           startTime: parseFloat(process.env.WATERMARK_START_TIME) || 1.0,
-          opacity: parseFloat(process.env.WATERMARK_OPACITY) || 0.62,
-          yPosition: parseFloat(process.env.WATERMARK_Y_POSITION) || 0.60,
+          opacity: parseFloat(process.env.WATERMARK_OPACITY) || 0.95,
+          yPosition: parseFloat(process.env.WATERMARK_Y_POSITION) || 0.82,
         }, (wmMsg) => {
           sendEvent('progress', { message: wmMsg });
         });
@@ -606,14 +617,22 @@ app.get('/api/upload', async (req, res) => {
       newVideoUrl: result.url,
       newTitle: result.title,
       status: 'uploaded',
-      privacy
+      privacy: result.privacy || privacy,
+      publishAt: result.publishAt || null,
+      qualityCheck: qualityResult
     });
 
+    const completionMsg = result.publishAt
+      ? `🎉 Upload complete! Held as Private on YouTube, auto-scheduled to go Public at ${new Date(result.publishAt).toLocaleString()}`
+      : '🎉 Upload complete!';
+
     sendEvent('done', {
-      message: 'Upload complete!',
+      message: completionMsg,
       videoUrl: result.url,
       videoId: result.videoId,
       title: result.title,
+      publishAt: result.publishAt || null,
+      privacy: result.privacy || privacy
     });
   } catch (err) {
     console.error('Upload pipeline error:', err);

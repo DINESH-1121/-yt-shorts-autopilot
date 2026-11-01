@@ -164,7 +164,8 @@
               <div class="form-group">
                 <label for="video-privacy">Publish Privacy</label>
                 <select id="video-privacy">
-                  <option value="private">Private (Default — Safe for review)</option>
+                  <option value="scheduled" selected>⚡ Auto-Schedule (Held Private, Every 8 Hours Apart)</option>
+                  <option value="private">Private (Safe for review)</option>
                   <option value="unlisted">Unlisted</option>
                   <option value="public">Public (Immediate publish)</option>
                 </select>
@@ -201,8 +202,9 @@
                 <path d="M8 12l3 3 5-5" />
               </svg>
             </div>
-            <h3>Uploaded Successfully!</h3>
-            <p class="subtitle">Your short is now live on your YouTube channel</p>
+            <h3 id="result-heading">Uploaded Successfully!</h3>
+            <p id="result-subtitle" class="subtitle">Your short is now live on your YouTube channel</p>
+            <div id="result-schedule-badge" class="hidden mb-sm" style="background: rgba(16, 185, 129, 0.12); border: 1px solid #10b981; border-radius: 8px; padding: 8px 14px; font-weight: 600; color: #10b981; font-size: 0.95rem; margin-top: 8px; margin-bottom: 12px;"></div>
             <a id="result-link" href="#" target="_blank" class="result-url" rel="noopener noreferrer"></a>
             <button class="btn btn-secondary" onclick="resetForm()">Upload Another</button>
           </div>
@@ -307,6 +309,7 @@
             <div class="form-group">
               <label for="auto-privacy">Publish Privacy</label>
               <select id="auto-privacy" onchange="updateSettings()">
+                <option value="scheduled">⚡ Auto-Schedule (Held Private, Every 8 Hours Apart)</option>
                 <option value="private">Private (Recommended for Review)</option>
                 <option value="unlisted">Unlisted</option>
                 <option value="public">Public (Direct publish)</option>

@@ -168,6 +168,26 @@ function startUpload() {
         progressText.textContent = data.message;
         addLog(`✅ ${data.message}`);
 
+        const resultHeading = document.getElementById('result-heading');
+        const resultSubtitle = document.getElementById('result-subtitle');
+        const scheduleBadge = document.getElementById('result-schedule-badge');
+
+        if (data.publishAt) {
+          const formatted = new Date(data.publishAt).toLocaleString([], {
+            weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+          });
+          if (resultHeading) resultHeading.textContent = 'Uploaded & Auto-Scheduled!';
+          if (resultSubtitle) resultSubtitle.textContent = 'Held as Private on YouTube; will flip to Public automatically.';
+          if (scheduleBadge) {
+            scheduleBadge.textContent = `📅 Scheduled Public Release: ${formatted}`;
+            scheduleBadge.classList.remove('hidden');
+          }
+        } else {
+          if (resultHeading) resultHeading.textContent = 'Uploaded Successfully!';
+          if (resultSubtitle) resultSubtitle.textContent = 'Your short is now live on your YouTube channel';
+          if (scheduleBadge) scheduleBadge.classList.add('hidden');
+        }
+
         resultLink.href = data.videoUrl;
         resultLink.textContent = data.videoUrl;
         resultSection.classList.remove('hidden');
@@ -231,7 +251,9 @@ function resetForm() {
   document.getElementById('video-url').value = '';
   document.getElementById('video-title').value = '';
   document.getElementById('video-desc').value = '';
-  document.getElementById('video-privacy').value = 'private';
+  document.getElementById('video-privacy').value = 'scheduled';
+  const scheduleBadge = document.getElementById('result-schedule-badge');
+  if (scheduleBadge) scheduleBadge.classList.add('hidden');
   resultSection.classList.add('hidden');
   errorSection.classList.add('hidden');
   progressSection.classList.add('hidden');
@@ -923,6 +945,7 @@ async function loadHistory() {
             <span>${item.uploadedAt ? new Date(item.uploadedAt).toLocaleDateString() : ''}</span>
             <span>•</span>
             <span>Privacy: ${item.privacy || 'private'}</span>
+            ${item.publishAt ? `<span>•</span><span style="color:#10b981;font-weight:600;">📅 Scheduled: ${new Date(item.publishAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>` : ''}
           </div>
         `;
       }

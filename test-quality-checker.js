@@ -1,4 +1,5 @@
 // test-quality-checker.js — Comprehensive verification of AI Quality Checker
+require('dotenv').config();
 const { checkVideoQuality, heuristicQualityCheck, extractSampleFrames } = require('./lib/qualityChecker');
 const fs = require('fs');
 const { execSync } = require('child_process');

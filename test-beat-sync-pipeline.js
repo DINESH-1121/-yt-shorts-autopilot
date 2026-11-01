@@ -1,4 +1,5 @@
 // test-beat-sync-pipeline.js — Verification test suite for Beat Sync Option A & Title Integration
+require('dotenv').config();
 const path = require('path');
 const fs = require('fs');
 const { execSync } = require('child_process');

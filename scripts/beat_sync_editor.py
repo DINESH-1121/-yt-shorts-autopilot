@@ -229,8 +229,8 @@ def master_pass(
       * Sidechain compression + balanced amix and alimiter to prevent clipping.
       * Seamless loop fades (afade in 0.15s, afade out 0.5s) on both audio streams.
     """
-    fade_in_d = 0.15
-    fade_out_d = 0.50
+    fade_in_d = 0.02
+    fade_out_d = 0.02
     fade_out_st = max(0.0, total_duration - fade_out_d)
 
     # Dynamic Audio Mixing Filtergraph:
@@ -319,28 +319,15 @@ def run_beat_sync_pipeline(
 
     temp_dir = tempfile.mkdtemp(prefix="beat_sync_")
     try:
-        # 1. Slicing beat segments WITHOUT stripping audio (-c:a aac -b:a 192k)
-        segment_paths = []
-        cur_time = 0.0
-        seg_idx = 0
-
-        while cur_time < total_duration:
-            seg_dur = min(beat_interval, total_duration - cur_time)
-            seg_out = os.path.join(temp_dir, f"seg_{seg_idx:04d}.mp4")
-            slice_segment(
-                input_video=video_path,
-                start_time=cur_time,
-                duration=seg_dur,
-                output_path=seg_out,
-                has_audio=v_info["has_audio"]
-            )
-            segment_paths.append(seg_out)
-            cur_time += seg_dur
-            seg_idx += 1
-
-        # 2. Concat all sliced segments into intermediate video with audio
+        # 1. Format visual track to 9:16 vertical 1080x1920 in a single fast pass WITHOUT stripping audio
         concat_video = os.path.join(temp_dir, "concat_track.mp4")
-        concat_segments(segment_paths, concat_video)
+        slice_segment(
+            input_video=video_path,
+            start_time=0.0,
+            duration=total_duration,
+            output_path=concat_video,
+            has_audio=v_info["has_audio"]
+        )
 
         # 3. Final Master Pass: Mix 0:a (original SFX ducked to 18%) with 1:a (Phonk at 100%)
         master_pass(
