@@ -10,13 +10,13 @@ const PORT = process.env.PORT || 3000;
 
 // ── Auto-Pilot Modules ──────────────────────────────────────────────────
 const { getConfig, saveConfig, getHistory, isAlreadyUploaded, addToHistory } = require('./lib/store');
-const { runAutoPilotCycle, setupScheduler, getRecentLogs, isBusy } = require('./lib/autopilot');
+const { runAutoPilotCycle, setupScheduler, getRecentLogs, isBusy, clearCandidatePool } = require('./lib/autopilot');
 const { rewriteSingleVideoMetadata, normalizeModelName } = require('./lib/aiEngine');
 const { listFreeModels } = require('./lib/aiClient');
 const { getScheduleInfo, buildCronFromCadence } = require('./lib/cadence');
 const { ensureShortsFormat } = require('./lib/shortsFormatter');
 const { authArgs, describeError } = require('./lib/ytdlp');
-const { checkVideoQuality } = require('./lib/qualityChecker');
+const { checkVideoQuality, heuristicQualityCheck } = require('./lib/qualityChecker');
 
 // ── Directories ──────────────────────────────────────────────────────────
 const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
@@ -167,7 +167,7 @@ function downloadVideo(url, onProgress, existingMetadata = null) {
     const startDownload = (metadata) => {
       onProgress?.('Downloading video in High Quality (1080p60 / 4K)...');
 
-      // Uncompromised studio stream selection: best video + best audio, sorted by resolution and bitrate
+      // Uncompromised studio stream selection: 1080p60 native Shorts resolution sorted by bitrate
       const dlArgs = [
         '--no-warnings',
         '--newline',
@@ -176,8 +176,8 @@ function downloadVideo(url, onProgress, existingMetadata = null) {
         '--no-live-from-start',
         '--match-filter', '!is_live & !was_live & live_status =? "not_live"',
         '--max-filesize', '250M', // Protect against runaway live recordings or full movies
-        '-f', 'bv*+ba/b',
-        '--format-sort', 'res,fps,br,size',
+        '-f', 'bv*[height<=1080]+ba/b[height<=1080]/bv*+ba/b',
+        '--format-sort', 'res:1080,fps:60,br,size',
         '--merge-output-format', 'mp4',
         '-o', outputTemplate,
         url,
@@ -302,38 +302,60 @@ async function uploadToYouTube(filePath, metadata, onProgress) {
   onProgress?.('Uploading to YouTube...');
 
     const isGaming = /gta|game|gaming|gameplay|clutch|ps5|xbox|unreal|valorant|minecraft|cod|fortnite|wukong|esports/i.test(`${metadata.title} ${metadata.description || ''}`);
-    const res = await youtube.videos.insert({
-      part: 'snippet,status',
-      requestBody: {
-        snippet: {
-          title: metadata.title.substring(0, 100),
-          description: metadata.description || '',
-          categoryId: isGaming ? '20' : '22',
+    try {
+      const res = await youtube.videos.insert({
+        part: 'snippet,status',
+        requestBody: {
+          snippet: {
+            title: metadata.title.substring(0, 100),
+            description: metadata.description || '',
+            categoryId: isGaming ? '20' : '22',
+          },
+          status: {
+            privacyStatus: metadata.privacy || 'private',
+            selfDeclaredMadeForKids: false,
+          },
         },
-      status: {
-        privacyStatus: metadata.privacy || 'private',
-        selfDeclaredMadeForKids: false,
-      },
-    },
-    media: {
-      body: fs.createReadStream(filePath),
-    },
-  }, {
-    onUploadProgress: (evt) => {
-      const pct = Math.round((evt.bytesRead / fileSize) * 100);
-      if (pct >= 100) {
-        onProgress?.('Uploading to YouTube: 100% (Finalizing upload on YouTube servers, awaiting confirmation...)');
-      } else {
-        onProgress?.(`Uploading to YouTube: ${pct}%`);
-      }
-    },
-  });
+        media: {
+          body: fs.createReadStream(filePath),
+        },
+      }, {
+        onUploadProgress: (evt) => {
+          const pct = Math.round((evt.bytesRead / fileSize) * 100);
+          if (pct >= 100) {
+            onProgress?.('Uploading to YouTube: 100% (Finalizing upload on YouTube servers, awaiting confirmation...)');
+          } else {
+            onProgress?.(`Uploading to YouTube: ${pct}%`);
+          }
+        },
+      });
 
-  return {
-    videoId: res.data.id,
-    url: `https://www.youtube.com/watch?v=${res.data.id}`,
-    title: res.data.snippet?.title,
-  };
+      return {
+        videoId: res.data.id,
+        url: `https://www.youtube.com/watch?v=${res.data.id}`,
+        title: res.data.snippet?.title,
+      };
+    } catch (err) {
+      const msg = (err.message || '').toLowerCase();
+      const errors = err.errors || [];
+      const reasons = errors.map(e => (e.reason || '').toLowerCase());
+      const isQuota = (
+        reasons.includes('quotaexceeded') ||
+        reasons.includes('uploadlimitexceeded') ||
+        reasons.includes('dailyuploadlimitexceeded') ||
+        msg.includes('quotaexceeded') ||
+        msg.includes('upload limit exceeded') ||
+        msg.includes('daily upload limit exceeded') ||
+        (err.code === 403 && msg.includes('quota'))
+      );
+      if (isQuota) {
+        const quotaErr = new Error('Daily YouTube API upload quota reached (10,000 units / ~6 uploads per day). YouTube resets daily quota at midnight Pacific Time (PT).');
+        quotaErr.isQuotaExceeded = true;
+        quotaErr.code = 403;
+        throw quotaErr;
+      }
+      throw err;
+    }
 }
 
 // ── API Routes ───────────────────────────────────────────────────────────
@@ -482,7 +504,13 @@ app.get('/api/upload', async (req, res) => {
     });
   } catch (err) {
     console.error('Upload pipeline error:', err);
-    sendEvent('error', { message: err.message || 'An unexpected error occurred.' });
+    if (err.isQuotaExceeded || String(err.message).includes('quota')) {
+      sendEvent('error', {
+        message: '🛑 YouTube Daily Upload Quota Exceeded (10,000 units / ~6 uploads per day). YouTube quota resets daily at midnight Pacific Time (PT).'
+      });
+    } else {
+      sendEvent('error', { message: err.message || 'An unexpected error occurred.' });
+    }
   } finally {
     // Clean up downloaded file
     if (downloadedFile && fs.existsSync(downloadedFile)) {
@@ -539,6 +567,7 @@ app.post('/api/autopilot/cadence-preview', (req, res) => {
 // Update Auto-Pilot configuration
 app.post('/api/autopilot/config', (req, res) => {
   try {
+    clearCandidatePool();
     const updated = saveConfig(req.body);
     setupScheduler({
       ytDlpPath: YT_DLP,
