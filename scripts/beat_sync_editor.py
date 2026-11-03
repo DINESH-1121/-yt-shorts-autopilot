@@ -118,21 +118,15 @@ def resolve_phonk_track(requested_track=None):
 
 
 def get_video_codec_args():
-    """Returns platform-optimized video codec arguments."""
-    if sys.platform == "darwin":
-        return [
-            "-c:v", "h264_videotoolbox",
-            "-b:v", "8M",
-            "-maxrate", "12M",
-            "-bufsize", "16M",
-            "-profile:v", "high",
-            "-pix_fmt", "yuv420p"
-        ]
+    """Returns a consistent, high-quality codec configuration."""
     return [
         "-c:v", "libx264",
-        "-preset", "veryfast",
-        "-crf", "20",
+        "-preset", "medium",
+        "-crf", "17",
         "-profile:v", "high",
+        "-level:v", "4.2",
+        "-maxrate", "16M",
+        "-bufsize", "24M",
         "-pix_fmt", "yuv420p"
     ]
 
@@ -143,11 +137,10 @@ def slice_segment(input_video, start_time, duration, output_path, has_audio=True
     CRITICAL: Does NOT strip source audio (-an).
     Retains audio with '-c:a aac -b:a 192k' so dialogue/SFX stay intact.
     """
-    # Scale and center-crop to 1080x1920 9:16 vertical Shorts format
-    v_filter = (
-        "scale=1080:1920:force_original_aspect_ratio=increase,"
-        "crop=1080:1920,setsar=1,fps=30"
-    )
+    # Keep the source frame intact here. The dedicated Shorts formatter later
+    # handles 9:16 framing, using a blurred background for landscape footage
+    # instead of cropping the subject out of the shot.
+    v_filter = "setpts=PTS-STARTPTS,setsar=1"
 
     cmd = [
         FFMPEG_BIN,

@@ -5,10 +5,12 @@
  * Exercises the complete optimized pipeline:
  * 1. Generates authentic action/edit source video
  * 2. Beat-sync Phonk mixing (100% music + 18% dialogue ducking)
- * 3. 9:16 Vertical Short transcode with Apple VideoToolbox & EBU R128 -14 LUFS
- * 4. 0–2.5s Dynamic Visual Hook Banner in upper-third safe zone (y=0.16)
- * 5. Animated Line-Reveal Watermark in lower-mid safe zone (y=0.60)
- * 6. Optimized SEO metadata generation with @Editclips-k2r formula
+ * 3. 9:16 Vertical Short transcode with preserved framing & EBU R128 -14 LUFS
+ * 4. Cinematic color grading from the active Visual Identity profile
+ * 5. 0–2.5s Dynamic Visual Hook Banner in upper-third safe zone (y=0.16)
+ * 6. Animated DITCH_67 channel branding from the active profile
+ * 7. Local 1440x2560 Shorts enhancement
+ * 8. Optimized SEO metadata generation
  */
 
 const fs = require('fs');
@@ -19,6 +21,8 @@ const { ensureShortsFormat, probeVideo } = require('../lib/shortsFormatter');
 const { createBeatSyncedShort } = require('../lib/beatSyncTranscoder');
 const { applyVisualHookInPlace, generateHookText } = require('../lib/visualHook');
 const { applyWatermarkInPlace } = require('../lib/watermark');
+const { getVisualIdentityConfig, getActiveBrandProfile, applyColorGradeInPlace } = require('../lib/visualIdentity');
+const { enhanceForYouTubeShortsInPlace } = require('../lib/localEnhancer');
 const { buildCandidateMetadata } = require('../lib/aiEngine');
 const { buildBeatSyncTitle, buildBeatSyncDescription } = require('../lib/aiClient');
 
@@ -33,15 +37,16 @@ async function main() {
 
   const rawSourcePath = path.join(DOWNLOADS_DIR, 'raw_input_sample.mp4');
   const finalValidationPath = path.join(DOWNLOADS_DIR, 'validation_sample_short.mp4');
+  const cinematicSourcePath = path.join(PROJECT_ROOT, 'assets', 'sample-source-cinematic.png');
 
   const requestedDuration = parseFloat(process.argv[2]) || 10.0;
-  // Account for 1.03x speed shift in hash evasion transcode so output is exactly requestedDuration
-  const sourceDuration = (requestedDuration * 1.03).toFixed(2);
+  const sourceDuration = requestedDuration.toFixed(2);
 
-  // 1. Create a dynamic action test video
-  console.log(`🎬 Step 1: Synthesizing raw action edit clip (${sourceDuration}s -> ~${requestedDuration}s output)...`);
+  // 1. Create a cinematic source clip from a portrait film still. This keeps
+  // the no-upload sample visually meaningful instead of using test bars.
+  console.log(`🎬 Step 1: Building cinematic source clip (${sourceDuration}s -> ~${requestedDuration}s output)...`);
   execSync(
-    `ffmpeg -y -f lavfi -i "testsrc2=size=1080x1920:rate=30" -f lavfi -i "sine=frequency=320:sample_rate=48000" -t ${sourceDuration} -c:v libx264 -pix_fmt yuv420p -c:a aac "${rawSourcePath}" 2>/dev/null`
+    `ffmpeg -y -loop 1 -i "${cinematicSourcePath}" -f lavfi -i "sine=frequency=320:sample_rate=48000" -t ${sourceDuration} -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,zoompan=z='min(1.0+0.00035*on,1.025)':d=1:s=1080x1920:fps=30,format=yuv420p" -c:v libx264 -preset veryfast -crf 18 -c:a aac "${rawSourcePath}" 2>/dev/null`
   );
   console.log(`✅ Raw clip created: ${rawSourcePath}`);
 
@@ -49,27 +54,60 @@ async function main() {
 
   // 2. Beat-Sync Phonk Audio Mixing
   console.log('\n🎵 Step 2: Applying Beat-Sync Phonk Mixing (100% music + 18% dialogue ducking)...');
-  const beatResult = await createBeatSyncedShort(currentVideo, {
-    duration: parseFloat(sourceDuration),
-    ducking: 0.18,
-    phonkVolume: 1.0,
-    bpm: 130.0
-  }, (msg) => console.log('   [progress]', msg));
+  let songName = 'source audio fallback';
+  try {
+    const beatResult = await createBeatSyncedShort(currentVideo, {
+      duration: parseFloat(sourceDuration),
+      ducking: 0.18,
+      phonkVolume: 1.0,
+      bpm: 130.0
+    }, (msg) => console.log('   [progress]', msg));
+    currentVideo = beatResult.outputPath;
+    songName = beatResult.songName;
+    console.log(`✅ Beat-sync complete with song: "${songName}"`);
+  } catch (err) {
+    console.warn(`⚠️ Beat-sync unavailable in this environment; continuing with source audio: ${err.message}`);
+  }
 
-  currentVideo = beatResult.outputPath;
-  const songName = beatResult.songName;
-  console.log(`✅ Beat-sync complete with song: "${songName}"`);
-
-  // 3. Strict 9:16 Shorts Transcode with Apple VideoToolbox & EBU R128 Loudness
-  console.log('\n🎨 Step 3: Hardware Transcoding (9:16 Vertical, EBU R128 -14 LUFS, Seamless Loop)...');
+  // 3. Strict 9:16 Shorts Transcode with preserved framing & EBU R128 Loudness
+  console.log('\n🎨 Step 3: Shorts Transcoding (9:16 Vertical, EBU R128 -14 LUFS, Seamless Loop)...');
   const formattedVideo = await ensureShortsFormat(currentVideo, (msg) => {
     console.log('   [progress]', msg);
   }, { enableEndCard: false });
   currentVideo = formattedVideo;
-  console.log(`✅ VideoToolbox formatting complete: ${currentVideo}`);
+  console.log(`✅ Shorts formatting complete: ${currentVideo}`);
 
-  // 4. Generate Viral Metadata
-  console.log('\n🧠 Step 4: Formulating Viral Packaging & Visual Hook...');
+  const identity = getVisualIdentityConfig();
+  const brandProfile = getActiveBrandProfile(identity);
+  const sampleBrandProfile = {
+    ...brandProfile,
+    label: '',
+    brandName: 'DITCH_67',
+    since: '',
+    fontFamily: 'Futura',
+    fontSize: 31,
+    letterSpacing: 6,
+    // Match the supplied Paradise signature: spaced white lettering, glow,
+    // and a blinking cursor at the leading edge of the reveal.
+    animationStyle: 'slide-reveal',
+    visibility: 'animated',
+    position: 'custom',
+    customPosition: { x: 0.5, y: 0.87 },
+    opacity: 0.95,
+    primaryColor: '#f4f7ff',
+    secondaryColor: '#dfeaff',
+    glowColor: '#a8ddff',
+    glow: 0.48,
+    shadow: 0.68
+  };
+
+  // 4. Apply the active cinematic grade before overlays
+  console.log(`\n🎞️ Step 4: Applying ${brandProfile.grading.preset} cinematic grade...`);
+  await applyColorGradeInPlace(currentVideo, brandProfile.grading, (msg) => console.log('   [progress]', msg));
+  console.log('✅ Cinematic color grade applied.');
+
+  // 5. Generate Viral Metadata
+  console.log('\n🧠 Step 5: Formulating Viral Packaging & Visual Hook...');
   const hookText = 'The Shadow Monarch Awakens 💀';
   const metadata = {
     title: 'Coldest Awakening Scene | Solo Leveling',
@@ -94,26 +132,29 @@ async function main() {
 
   const firstComment = 'Who had the coldest awakening aura in this scene?';
 
-  // 5. Apply 0–2.5s Dynamic Visual Hook Banner
-  console.log('\n⚡ Step 5: Compositing 0–2.5s Visual Hook Banner (Upper-third safe zone y=0.16)...');
-  await applyVisualHookInPlace(currentVideo, {
-    text: hookText,
-    duration: 2.5,
-    yPosition: 0.16
-  }, (msg) => console.log('   [progress]', msg));
-  console.log(`✅ Visual Hook applied: "${hookText}"`);
+  // 6. The supplied reference keeps the footage unobstructed, so the sample
+  // leaves the large hook pill off. The production pipeline still supports it.
+  console.log('\n⚡ Step 6: Keeping the opening frame unobstructed to match the reference Short.');
 
-  // 6. Apply Animated Branding Watermark (Viral Pirata One Cursor-Reveal at y=0.82)
-  console.log('\n🏷️ Step 6: Compositing Animated Channel Watermark (Viral Short replica style at y=0.82)...');
-  const watermarkText = process.env.WATERMARK_TEXT || 'MADE BY @SHORTSSTUDIO';
+  // 7. Apply the active reusable channel branding profile
+  console.log(`\n🏷️ Step 7: Compositing restrained ${sampleBrandProfile.brandName} channel branding...`);
   await applyWatermarkInPlace(currentVideo, {
-    text: watermarkText,
-    startTime: 1.0,
-    duration: 4.1,
-    opacity: 0.95,
-    yPosition: 0.82
+    text: `${sampleBrandProfile.label} ${sampleBrandProfile.brandName}`,
+    startTime: 1.2,
+    duration: 4.8,
+    revealDuration: 0.8,
+    holdDuration: 3.2,
+    wipeDuration: 0.8,
+    opacity: sampleBrandProfile.opacity,
+    yPosition: 0.84,
+    brand: sampleBrandProfile
   }, (msg) => console.log('   [progress]', msg));
-  console.log(`✅ Watermark applied: "${watermarkText}"`);
+  console.log(`✅ Branding applied: "${sampleBrandProfile.label} ${sampleBrandProfile.brandName}"`);
+
+  // 8. Final local enhancement (never uploads this file)
+  console.log('\n✨ Step 8: Applying local 1440x2560 Shorts enhancement...');
+  await enhanceForYouTubeShortsInPlace(currentVideo, (msg) => console.log('   [progress]', msg));
+  console.log('✅ Local enhancement applied.');
 
   // Rename to final output path
   if (currentVideo !== finalValidationPath) {
@@ -124,7 +165,7 @@ async function main() {
   // Cleanup raw input
   try { if (fs.existsSync(rawSourcePath)) fs.unlinkSync(rawSourcePath); } catch {}
 
-  // 7. Probe Final Validation Asset
+  // 9. Probe Final Validation Asset
   const info = await probeVideo(finalValidationPath);
   const stat = fs.statSync(finalValidationPath);
 

@@ -41,34 +41,207 @@ const historyContainer = document.getElementById('history-container');
 
 let uploadFinished = false;
 let autopilotConfig = null;
+let visualIdentityConfig = null;
+let identitySaveTimer = null;
 
 // ── Tab Navigation & Accessibility ───────────────────────────────────────
 function switchTab(tab) {
   const tabManual = document.getElementById('tab-btn-manual');
   const tabAuto = document.getElementById('tab-btn-autopilot');
+  const tabIdentity = document.getElementById('tab-btn-identity');
   const viewManual = document.getElementById('view-manual');
   const viewAuto = document.getElementById('view-autopilot');
+  const viewIdentity = document.getElementById('view-identity');
 
-  if (tab === 'manual') {
-    tabManual.classList.add('active');
-    tabManual.setAttribute('aria-selected', 'true');
-    tabAuto.classList.remove('active');
-    tabAuto.setAttribute('aria-selected', 'false');
+  const tabs = { manual: tabManual, autopilot: tabAuto, identity: tabIdentity };
+  const views = { manual: viewManual, autopilot: viewAuto, identity: viewIdentity };
+  Object.entries(tabs).forEach(([key, element]) => {
+    if (!element) return;
+    const active = key === tab;
+    element.classList.toggle('active', active);
+    element.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+  Object.entries(views).forEach(([key, element]) => {
+    if (element) element.classList.toggle('hidden', key !== tab);
+  });
 
-    viewManual.classList.remove('hidden');
-    viewAuto.classList.add('hidden');
-  } else {
-    tabAuto.classList.add('active');
-    tabAuto.setAttribute('aria-selected', 'true');
-    tabManual.classList.remove('active');
-    tabManual.setAttribute('aria-selected', 'false');
-
-    viewAuto.classList.remove('hidden');
-    viewManual.classList.add('hidden');
-
+  if (tab === 'autopilot') {
     loadAutoPilotConfig();
     loadHistory();
+  } else if (tab === 'identity') {
+    loadVisualIdentity();
   }
+}
+
+// ── Visual Identity Studio ───────────────────────────────────────────────
+function activeIdentityProfile() {
+  if (!visualIdentityConfig?.profiles?.length) return null;
+  return visualIdentityConfig.profiles.find(p => p.id === visualIdentityConfig.activeProfileId)
+    || visualIdentityConfig.profiles[0];
+}
+
+function identityControl(id, value) {
+  const element = document.getElementById(id);
+  if (element && value !== undefined && value !== null) element.value = value;
+}
+
+function renderIdentityProfile() {
+  const profile = activeIdentityProfile();
+  if (!profile) return;
+  const grading = profile.grading || {};
+  const profileSelect = document.getElementById('identity-profile');
+  if (profileSelect) {
+    profileSelect.innerHTML = '';
+    visualIdentityConfig.profiles.forEach(item => {
+      const option = document.createElement('option');
+      option.value = item.id;
+      option.textContent = item.name || item.brandName;
+      profileSelect.appendChild(option);
+    });
+    profileSelect.value = profile.id;
+  }
+
+  identityControl('identity-preset', profile.colorPreset);
+  identityControl('identity-profile-name', profile.name);
+  identityControl('identity-brand-name', profile.brandName);
+  identityControl('identity-label', profile.label);
+  identityControl('identity-since', profile.since);
+  identityControl('identity-font', profile.fontFamily);
+  identityControl('identity-animation', profile.animationStyle);
+  identityControl('identity-position', profile.position);
+  identityControl('identity-visibility', profile.visibility);
+  identityControl('identity-font-size', profile.fontSize);
+  identityControl('identity-letter-spacing', profile.letterSpacing);
+  identityControl('identity-opacity', profile.opacity);
+  identityControl('identity-glow', profile.glow);
+  identityControl('identity-shadow', profile.shadow);
+  identityControl('identity-outline', profile.outlineWidth);
+  identityControl('identity-start', profile.startTime);
+  identityControl('identity-reveal', profile.revealDuration);
+  identityControl('identity-hold', profile.holdDuration);
+  identityControl('identity-exit', profile.exitDuration);
+  identityControl('identity-custom-x', profile.customPosition?.x);
+  identityControl('identity-custom-y', profile.customPosition?.y);
+
+  ['exposure', 'contrast', 'saturation', 'temperature', 'tint', 'highlights', 'shadows', 'gamma', 'vibrance', 'fade', 'vignette', 'filmGrain', 'glow'].forEach(key => {
+    identityControl(`grade-${key === 'filmGrain' ? 'film-grain' : key}`, grading[key]);
+  });
+
+  const label = document.getElementById('brand-preview-label');
+  const name = document.getElementById('brand-preview-name');
+  const since = document.getElementById('brand-preview-since');
+  if (label) label.textContent = profile.label || 'MADE BY';
+  if (name) name.textContent = profile.brandName || 'DITCH_67';
+  if (since) since.textContent = profile.since || '';
+  const stage = document.getElementById('brand-preview-stage');
+  if (stage) {
+    stage.style.setProperty('--identity-primary', profile.primaryColor || '#fff');
+    stage.style.setProperty('--identity-secondary', profile.secondaryColor || '#d8e8ff');
+    stage.dataset.animation = profile.animationStyle || 'cursor-reveal';
+  }
+  const after = document.getElementById('grading-after');
+  if (after) {
+    const temp = Number(grading.temperature || 0);
+    const sat = Number(grading.saturation || 1);
+    const tint = Number(grading.tint || 0);
+    after.style.filter = `saturate(${sat}) hue-rotate(${(temp + tint) * 18}deg) contrast(${Number(grading.contrast || 1)})`;
+  }
+  const status = document.getElementById('identity-status');
+  if (status) status.textContent = `Active: ${profile.name || profile.brandName}`;
+}
+
+async function loadVisualIdentity() {
+  try {
+    const res = await fetch('/api/visual-identity');
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Could not load Visual Identity Studio');
+    visualIdentityConfig = { activeProfileId: data.activeProfileId, profiles: data.profiles, presets: data.presets };
+    renderIdentityProfile();
+  } catch (err) {
+    const status = document.getElementById('identity-status');
+    if (status) status.textContent = 'Unable to load profile';
+    console.error('Failed to load visual identity:', err);
+  }
+}
+
+function scheduleIdentitySave() {
+  clearTimeout(identitySaveTimer);
+  identitySaveTimer = setTimeout(() => saveVisualIdentity(), 350);
+}
+
+function updateIdentityField(field, value) {
+  const profile = activeIdentityProfile();
+  if (!profile) return;
+  const numericFields = new Set(['fontSize', 'letterSpacing', 'opacity', 'glow', 'shadow', 'outlineWidth', 'startTime', 'revealDuration', 'holdDuration', 'exitDuration']);
+  profile[field] = numericFields.has(field) ? Number(value) : value;
+  renderIdentityProfile();
+  scheduleIdentitySave();
+}
+
+function updateCustomPosition(axis, value) {
+  const profile = activeIdentityProfile();
+  if (!profile) return;
+  profile.customPosition = profile.customPosition || { x: 0.5, y: 0.82 };
+  profile.customPosition[axis] = Number(value);
+  profile.position = 'custom';
+  renderIdentityProfile();
+  scheduleIdentitySave();
+}
+
+function updateGradeControl(field, value) {
+  const profile = activeIdentityProfile();
+  if (!profile) return;
+  profile.grading = profile.grading || {};
+  profile.colorPreset = 'custom';
+  profile.grading.preset = 'custom';
+  profile.grading[field] = Number(value);
+  renderIdentityProfile();
+  scheduleIdentitySave();
+}
+
+function updateIdentityPreset(preset) {
+  const profile = activeIdentityProfile();
+  const presetData = visualIdentityConfig?.presets?.[preset];
+  if (!profile || !presetData) return;
+  profile.colorPreset = preset;
+  profile.grading = { ...presetData, preset };
+  renderIdentityProfile();
+  scheduleIdentitySave();
+}
+
+function selectIdentityProfile(profileId) {
+  if (!visualIdentityConfig) return;
+  visualIdentityConfig.activeProfileId = profileId;
+  renderIdentityProfile();
+  scheduleIdentitySave();
+}
+
+async function saveVisualIdentity() {
+  if (!visualIdentityConfig) return;
+  try {
+    const res = await fetch('/api/visual-identity', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ activeProfileId: visualIdentityConfig.activeProfileId, profiles: visualIdentityConfig.profiles })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      visualIdentityConfig = { activeProfileId: data.activeProfileId, profiles: data.profiles, presets: data.presets };
+      renderIdentityProfile();
+    }
+  } catch (err) {
+    console.error('Failed to save visual identity:', err);
+  }
+}
+
+async function saveIdentityAsProfile() {
+  const profile = activeIdentityProfile();
+  if (!profile || !visualIdentityConfig) return;
+  const copy = JSON.parse(JSON.stringify(profile));
+  copy.id = `${copy.brandName || 'brand'}-${Date.now()}`.toLowerCase().replace(/[^a-z0-9_-]+/g, '-');
+  copy.name = `${copy.name || copy.brandName} Copy`;
+  visualIdentityConfig.profiles.push(copy);
+  visualIdentityConfig.activeProfileId = copy.id;
+  await saveVisualIdentity();
 }
 
 // ── Auth ─────────────────────────────────────────────────────────────────
@@ -958,5 +1131,6 @@ async function loadHistory() {
 
 // ── Initial Boot ─────────────────────────────────────────────────────────
 checkAuth();
+loadVisualIdentity();
 loadAutoPilotConfig();
 loadHistory();

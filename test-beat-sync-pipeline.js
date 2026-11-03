@@ -126,7 +126,10 @@ async function runTestSuite() {
   const vStream = probeData.streams.find(s => s.codec_type === 'video');
   const aStream = probeData.streams.find(s => s.codec_type === 'audio');
 
-  assert(vStream && vStream.width === 1080 && vStream.height === 1920, 'Output format is 1080x1920 vertical 9:16', `${vStream.width}x${vStream.height}`);
+  // The beat-sync pass is audio-first and deliberately preserves framing.
+  // The following Shorts formatter owns the 9:16 conversion so we never crop
+  // a landscape source before its blurred-background layout is applied.
+  assert(vStream && vStream.width === 1280 && vStream.height === 720, 'Beat-sync preserves source framing for the Shorts formatter', `${vStream.width}x${vStream.height}`);
   assert(aStream !== undefined, 'Output contains mixed audio stream');
 
   // ── TEST 5: Orchestration with Metadata Generation ────────────────────────

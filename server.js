@@ -20,6 +20,14 @@ const { authArgs, resetAuthArgsCache, describeError } = require('./lib/ytdlp');
 const { checkVideoQuality, heuristicQualityCheck } = require('./lib/qualityChecker');
 const { createBeatSyncedShort } = require('./lib/beatSyncTranscoder');
 const { applyVisualHookInPlace, generateHookText } = require('./lib/visualHook');
+const { enhanceForYouTubeShortsInPlace } = require('./lib/localEnhancer');
+const {
+  COLOR_GRADING_PRESETS,
+  getVisualIdentityConfig,
+  saveVisualIdentityConfig,
+  getActiveBrandProfile,
+  applyColorGradeInPlace
+} = require('./lib/visualIdentity');
 
 // ── Directories ──────────────────────────────────────────────────────────
 const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
@@ -42,6 +50,41 @@ function cleanupStaleDownloads() {
   } catch {}
 }
 cleanupStaleDownloads();
+
+/**
+ * Applies the selected Brand Style Profile to a finished vertical Short.
+ * Both manual upload and Auto-Pilot call this helper so the channel identity
+ * cannot drift between workflows.
+ */
+function getPipelineBrandProfile() {
+  const identity = getVisualIdentityConfig();
+  return getActiveBrandProfile(identity);
+}
+
+async function applyVisualGradeInPlace(filePath, onProgress) {
+  const profile = getPipelineBrandProfile();
+  if (!profile || profile.enabled === false) return filePath;
+  await applyColorGradeInPlace(filePath, profile.grading, onProgress);
+  return filePath;
+}
+
+async function applyVisualBrandingInPlace(filePath, onProgress) {
+  const profile = getPipelineBrandProfile();
+  if (!profile || profile.enabled === false) return filePath;
+  const persistent = profile.visibility === 'persistent';
+  await applyWatermarkInPlace(filePath, {
+    text: `${profile.label} ${profile.brandName}`,
+    startTime: profile.startTime,
+    duration: persistent ? 58.5 : profile.revealDuration + profile.holdDuration + profile.exitDuration,
+    revealDuration: persistent ? 0.05 : profile.revealDuration,
+    holdDuration: persistent ? 58.35 : profile.holdDuration,
+    wipeDuration: persistent ? 0.1 : profile.exitDuration,
+    opacity: profile.opacity,
+    yPosition: profile.customPosition?.y || 0.82,
+    brand: profile
+  }, onProgress);
+  return filePath;
+}
 
 // ── Resolve yt-dlp binary path ───────────────────────────────────────────
 const YT_DLP = (() => {
@@ -98,6 +141,34 @@ oauth2Client.on('tokens', (tokens) => {
 // ── Middleware ────────────────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ── Visual Identity Studio ───────────────────────────────────────────────
+
+app.get('/api/visual-identity', (req, res) => {
+  res.json({ ok: true, ...getVisualIdentityConfig(), presets: COLOR_GRADING_PRESETS });
+});
+
+app.post('/api/visual-identity', (req, res) => {
+  try {
+    const saved = saveVisualIdentityConfig(req.body || {});
+    res.json({ ok: true, ...saved, presets: COLOR_GRADING_PRESETS });
+  } catch (err) {
+    res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/visual-identity/profiles', (req, res) => {
+  try {
+    const current = getVisualIdentityConfig();
+    const profile = req.body || {};
+    const profiles = current.profiles.filter(item => item.id !== profile.id);
+    profiles.push(profile);
+    const saved = saveVisualIdentityConfig({ ...current, profiles, activeProfileId: profile.id || current.activeProfileId });
+    res.json({ ok: true, ...saved, presets: COLOR_GRADING_PRESETS });
+  } catch (err) {
+    res.status(400).json({ ok: false, error: err.message });
+  }
+});
 
 // ── Auth Routes ──────────────────────────────────────────────────────────
 
@@ -179,8 +250,10 @@ function downloadVideo(url, onProgress, existingMetadata = null) {
         '--no-live-from-start',
         '--match-filter', '!is_live & !was_live & live_status =? "not_live"',
         '--max-filesize', '250M', // Protect against runaway live recordings or full movies
-        '-f', 'bv*[height<=1080]+ba/b[height<=1080]/bv*+ba/b',
-        '--format-sort', 'res:1080,fps:60,vcodec:h264,br,size',
+        // Do not cap by height: portrait 1080p is 1080x1920 and was being
+        // incorrectly downgraded to 608x1080 before the editor ever saw it.
+        '-f', 'bv*+ba/b',
+        '--format-sort', 'res,fps:60,vcodec:h264,br,size',
         '--merge-output-format', 'mp4',
         '-o', outputTemplate,
         url,
@@ -315,10 +388,27 @@ async function uploadToYouTube(filePath, metadata, onProgress) {
 
     const requestedPrivacy = (metadata.privacy || 'scheduled').toLowerCase();
     if (metadata.publishAt || requestedPrivacy === 'scheduled') {
-      const scheduledTime = metadata.publishAt || getNextAutoScheduleSlot({ history: getHistory() });
+      const cfg = getConfig ? getConfig() : null;
+      let spacingHours = 5;
+      if (cfg && cfg.cadence) {
+        if (cfg.cadence.mode === 'interval' && cfg.cadence.intervalValue) {
+          spacingHours = parseInt(cfg.cadence.intervalValue, 10) || 5;
+        } else if (cfg.cadence.preset === 'every-8h') {
+          spacingHours = 8;
+        } else if (cfg.cadence.preset === 'every-12h') {
+          spacingHours = 12;
+        } else if (cfg.cadence.preset === 'every-4h') {
+          spacingHours = 4;
+        }
+      }
+      const scheduledTime = metadata.publishAt || getNextAutoScheduleSlot({
+        history: getHistory(),
+        bufferHours: spacingHours,
+        spacingHours: spacingHours
+      });
       statusObj.privacyStatus = 'private';
       statusObj.publishAt = scheduledTime;
-      console.log(`[YouTube] 📅 Auto-scheduling publication for: ${scheduledTime} (Held as Private on YouTube until release)`);
+      console.log(`[YouTube] 📅 Auto-scheduling publication for: ${scheduledTime} (${spacingHours}h spacing, held as Private on YouTube until release)`);
     } else {
       statusObj.privacyStatus = requestedPrivacy === 'public' ? 'public' : (requestedPrivacy === 'unlisted' ? 'unlisted' : 'private');
       console.log(`[YouTube] 🚀 Publishing with privacy status: ${statusObj.privacyStatus}`);
@@ -562,7 +652,18 @@ app.get('/api/upload', async (req, res) => {
     }, { enableEndCard: config.enableEndCard === true });
     downloadedFile = finalShortPath;
 
-    // Step 2d: Apply 0-2.5s Dynamic Visual Hook Banner (Upper-third safe zone)
+    // Step 2d: Apply the selected cinematic grade before overlays are composited.
+    try {
+      await applyVisualGradeInPlace(finalShortPath, (identityMsg) => {
+        sendEvent('progress', { message: identityMsg });
+      });
+      sendEvent('progress', { message: '✅ Cinematic color grade applied.' });
+    } catch (gradeErr) {
+      console.warn('[Server] ⚠️ Color grade failed (continuing with formatted video):', gradeErr.message);
+      sendEvent('progress', { message: `⚠️ Color grade could not be applied: ${gradeErr.message}` });
+    }
+
+    // Step 2e: Apply 0-2.5s Dynamic Visual Hook Banner (Upper-third safe zone)
     if (config.enableVisualHook !== false) {
       try {
         const hookText = enhancedMeta.visualHook || generateHookText({
@@ -582,23 +683,28 @@ app.get('/api/upload', async (req, res) => {
       }
     }
 
-    // Step 2e: Apply animated channel watermark overlay (Lower-third viral safe zone: y=0.82)
-    const watermarkText = process.env.WATERMARK_TEXT || config.watermarkText;
-    if (watermarkText) {
+    // Step 2f: Apply reusable DITCH_67 channel branding after the hook.
+    try {
+      await applyVisualBrandingInPlace(finalShortPath, (identityMsg) => {
+        sendEvent('progress', { message: identityMsg });
+      });
+      sendEvent('progress', { message: '✅ Visual Identity Studio branding applied.' });
+    } catch (identityErr) {
+      console.warn('[Server] ⚠️ Branding failed (continuing without):', identityErr.message);
+      sendEvent('progress', { message: `⚠️ Branding could not be applied: ${identityErr.message}` });
+    }
+
+    // Final local, Topaz-style finishing pass. This is intentionally last so
+    // overlays remain crisp and YouTube receives one high-bitrate 1440p Short.
+    if (config.enableLocalEnhancement !== false) {
       try {
-        sendEvent('progress', { message: `🏷️ Applying animated watermark: "${watermarkText.toUpperCase()}"...` });
-        await applyWatermarkInPlace(finalShortPath, {
-          text: watermarkText,
-          startTime: parseFloat(process.env.WATERMARK_START_TIME) || 1.0,
-          opacity: parseFloat(process.env.WATERMARK_OPACITY) || 0.95,
-          yPosition: parseFloat(process.env.WATERMARK_Y_POSITION) || 0.82,
-        }, (wmMsg) => {
-          sendEvent('progress', { message: wmMsg });
+        await enhanceForYouTubeShortsInPlace(finalShortPath, (enhanceMsg) => {
+          sendEvent('progress', { message: enhanceMsg });
         });
-        sendEvent('progress', { message: `✅ Watermark applied: "${watermarkText.toUpperCase()}"` });
-      } catch (wmErr) {
-        console.warn('[Server] ⚠️ Watermark failed (continuing without):', wmErr.message);
-        sendEvent('progress', { message: `⚠️ Watermark could not be applied: ${wmErr.message}` });
+        sendEvent('progress', { message: '✅ Local high-quality Shorts enhancement applied.' });
+      } catch (enhanceErr) {
+        console.warn('[Server] ⚠️ Local enhancement failed (uploading existing render):', enhanceErr.message);
+        sendEvent('progress', { message: `⚠️ Local enhancement skipped: ${enhanceErr.message}` });
       }
     }
 

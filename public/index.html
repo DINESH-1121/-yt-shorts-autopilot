@@ -107,6 +107,17 @@
         <span>🤖 AI Auto-Pilot Pro</span>
         <span id="autopilot-indicator" class="pill-badge pill-off" aria-hidden="true">OFF</span>
       </button>
+      <button
+        class="tab-btn"
+        id="tab-btn-identity"
+        role="tab"
+        aria-selected="false"
+        aria-controls="view-identity"
+        onclick="switchTab('identity')"
+      >
+        <span aria-hidden="true">✦</span>
+        <span>Visual Identity</span>
+      </button>
     </nav>
 
     <!-- Main Content Panels -->
@@ -222,6 +233,108 @@
             <h3>Upload Failed</h3>
             <p id="error-text" class="error-msg"></p>
             <button class="btn btn-secondary" onclick="resetForm()">Try Again</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 3: Visual Identity Studio -->
+      <section id="view-identity" class="view-panel hidden" role="tabpanel" aria-labelledby="tab-btn-identity">
+        <div class="card card-featured identity-hero">
+          <div class="flex-between identity-hero-row">
+            <div>
+              <div class="badge-row">
+                <h2>Visual Identity Studio</h2>
+                <span class="pro-tag">DITCH_67</span>
+              </div>
+              <p class="subtitle">Apply a consistent cinematic grade, typography system, and animated channel lockup to every Short.</p>
+            </div>
+            <div class="identity-status" id="identity-status">Loading profile…</div>
+          </div>
+        </div>
+
+        <div class="identity-grid">
+          <div class="card">
+            <div class="card-header">
+              <h3>🎞️ Color Grading</h3>
+              <p class="subtitle">A restrained grade preserves detail, skin tones, and highlight roll-off.</p>
+            </div>
+            <div class="form-group">
+              <label for="identity-preset">Preset</label>
+              <select id="identity-preset" onchange="updateIdentityPreset(this.value)">
+                <option value="cinematic-teal-orange">Cinematic Teal &amp; Orange</option>
+                <option value="dark-cinematic">Dark Cinematic</option>
+                <option value="moody-blue">Moody Blue</option>
+                <option value="warm-film">Warm Film</option>
+                <option value="vibrant-anime">Vibrant Anime</option>
+                <option value="high-contrast">High Contrast</option>
+                <option value="reference-paradise">Reference — Cool Steel Cinema</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+            <div class="grading-preview" aria-label="Before and after grading preview">
+              <div class="grading-swatch grading-before"><span>BEFORE</span></div>
+              <div class="grading-swatch grading-after" id="grading-after"><span>AFTER</span></div>
+            </div>
+            <div class="identity-control-grid">
+              <label>Exposure<input id="grade-exposure" type="range" min="-1" max="1" step="0.01" oninput="updateGradeControl('exposure', this.value)"></label>
+              <label>Contrast<input id="grade-contrast" type="range" min="0.5" max="1.8" step="0.01" oninput="updateGradeControl('contrast', this.value)"></label>
+              <label>Saturation<input id="grade-saturation" type="range" min="0" max="2" step="0.01" oninput="updateGradeControl('saturation', this.value)"></label>
+              <label>Temperature<input id="grade-temperature" type="range" min="-1" max="1" step="0.01" oninput="updateGradeControl('temperature', this.value)"></label>
+              <label>Tint<input id="grade-tint" type="range" min="-1" max="1" step="0.01" oninput="updateGradeControl('tint', this.value)"></label>
+              <label>Highlights<input id="grade-highlights" type="range" min="-1" max="1" step="0.01" oninput="updateGradeControl('highlights', this.value)"></label>
+              <label>Shadows<input id="grade-shadows" type="range" min="-1" max="1" step="0.01" oninput="updateGradeControl('shadows', this.value)"></label>
+              <label>Gamma<input id="grade-gamma" type="range" min="0.5" max="1.5" step="0.01" oninput="updateGradeControl('gamma', this.value)"></label>
+              <label>Vibrance<input id="grade-vibrance" type="range" min="-1" max="1" step="0.01" oninput="updateGradeControl('vibrance', this.value)"></label>
+              <label>Fade<input id="grade-fade" type="range" min="0" max="0.25" step="0.01" oninput="updateGradeControl('fade', this.value)"></label>
+              <label>Vignette<input id="grade-vignette" type="range" min="0" max="1" step="0.01" oninput="updateGradeControl('vignette', this.value)"></label>
+              <label>Film grain<input id="grade-film-grain" type="range" min="0" max="0.25" step="0.01" oninput="updateGradeControl('filmGrain', this.value)"></label>
+              <label>Glow<input id="grade-glow" type="range" min="0" max="0.25" step="0.01" oninput="updateGradeControl('glow', this.value)"></label>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>✦ Channel Branding</h3>
+              <p class="subtitle">The active profile is applied automatically to manual and Auto-Pilot batches.</p>
+            </div>
+            <div class="form-group">
+              <label for="identity-profile">Brand Style Profile</label>
+              <select id="identity-profile" onchange="selectIdentityProfile(this.value)"></select>
+            </div>
+            <div class="grid-2">
+              <div class="form-group"><label for="identity-profile-name">Profile name</label><input id="identity-profile-name" type="text" oninput="updateIdentityField('name', this.value)"></div>
+              <div class="form-group"><label for="identity-brand-name">Channel name</label><input id="identity-brand-name" type="text" oninput="updateIdentityField('brandName', this.value)"></div>
+              <div class="form-group"><label for="identity-label">Top line</label><input id="identity-label" type="text" oninput="updateIdentityField('label', this.value)"></div>
+              <div class="form-group"><label for="identity-since">Footer line</label><input id="identity-since" type="text" oninput="updateIdentityField('since', this.value)"></div>
+              <div class="form-group"><label for="identity-font">Font family</label><select id="identity-font" onchange="updateIdentityField('fontFamily', this.value)"><option value="Pirata One">Pirata One — Blackletter</option><option value="Impact">Impact — Heavy Sans</option><option value="Arial Black">Arial Black — Modern</option><option value="Futura">Futura — Minimal</option></select></div>
+              <div class="form-group"><label for="identity-animation">Animation style</label><select id="identity-animation" onchange="updateIdentityField('animationStyle', this.value)"><option value="typewriter">Typewriter reveal</option><option value="smooth-reveal">Smooth left-to-right</option><option value="slide-reveal">Slide in / slide out</option><option value="cursor-reveal">Cursor reveal</option><option value="fade-scale">Fade-in with scale</option><option value="blur-reveal">Cinematic blur reveal</option><option value="glitch-reveal">Glitch reveal</option><option value="neon-glow">Neon glow reveal</option><option value="minimal-fade">Minimal fade</option></select></div>
+              <div class="form-group"><label for="identity-position">Placement</label><select id="identity-position" onchange="updateIdentityField('position', this.value)"><option value="top-left">Top-left safe zone</option><option value="top-right">Top-right safe zone</option><option value="center">Center</option><option value="bottom-left">Bottom-left safe zone</option><option value="bottom-center">Bottom-center safe zone</option><option value="bottom-right">Bottom-right safe zone</option><option value="custom">Custom position</option></select></div>
+              <div class="form-group"><label for="identity-visibility">Visibility</label><select id="identity-visibility" onchange="updateIdentityField('visibility', this.value)"><option value="animated">Short animated watermark</option><option value="persistent">Persistent subtle watermark</option></select></div>
+            </div>
+            <div class="identity-control-grid">
+              <label>Font size<input id="identity-font-size" type="range" min="18" max="120" step="1" oninput="updateIdentityField('fontSize', this.value)"></label>
+              <label>Letter spacing<input id="identity-letter-spacing" type="range" min="-4" max="20" step="1" oninput="updateIdentityField('letterSpacing', this.value)"></label>
+              <label>Opacity<input id="identity-opacity" type="range" min="0.1" max="1" step="0.01" oninput="updateIdentityField('opacity', this.value)"></label>
+              <label>Glow<input id="identity-glow" type="range" min="0" max="1" step="0.01" oninput="updateIdentityField('glow', this.value)"></label>
+              <label>Shadow<input id="identity-shadow" type="range" min="0" max="1" step="0.01" oninput="updateIdentityField('shadow', this.value)"></label>
+              <label>Outline<input id="identity-outline" type="range" min="0" max="12" step="1" oninput="updateIdentityField('outlineWidth', this.value)"></label>
+            </div>
+            <div class="identity-timeline">
+              <div class="form-group"><label for="identity-start">Start (s)</label><input id="identity-start" type="number" min="0" max="55" step="0.1" oninput="updateIdentityField('startTime', this.value)"></div>
+              <div class="form-group"><label for="identity-reveal">Reveal (s)</label><input id="identity-reveal" type="number" min="0.05" max="4" step="0.05" oninput="updateIdentityField('revealDuration', this.value)"></div>
+              <div class="form-group"><label for="identity-hold">Hold (s)</label><input id="identity-hold" type="number" min="0.1" max="20" step="0.1" oninput="updateIdentityField('holdDuration', this.value)"></div>
+              <div class="form-group"><label for="identity-exit">Exit (s)</label><input id="identity-exit" type="number" min="0.05" max="4" step="0.05" oninput="updateIdentityField('exitDuration', this.value)"></div>
+            </div>
+            <div class="identity-timeline">
+              <div class="form-group"><label for="identity-custom-x">Custom X</label><input id="identity-custom-x" type="number" min="0.08" max="0.92" step="0.01" oninput="updateCustomPosition('x', this.value)"></div>
+              <div class="form-group"><label for="identity-custom-y">Custom Y</label><input id="identity-custom-y" type="number" min="0.10" max="0.90" step="0.01" oninput="updateCustomPosition('y', this.value)"></div>
+            </div>
+            <div class="brand-preview-stage" id="brand-preview-stage">
+              <span class="brand-preview-label" id="brand-preview-label">MADE BY</span>
+              <span class="brand-preview-name" id="brand-preview-name">DITCH_67</span>
+              <span class="brand-preview-since" id="brand-preview-since">SINCE 2026</span>
+            </div>
+            <div class="identity-actions"><button class="btn btn-secondary" onclick="saveIdentityAsProfile()">Save as new profile</button><button class="btn btn-primary identity-save" onclick="saveVisualIdentity()">Save active profile</button></div>
           </div>
         </div>
       </section>
@@ -461,7 +574,9 @@
                 <option value="every-2h" selected>Every 2 Hours</option>
                 <option value="every-3h">Every 3 Hours</option>
                 <option value="every-4h">Every 4 Hours</option>
+                <option value="every-5h" selected>Every 5 Hours (~5x Daily)</option>
                 <option value="every-6h">Every 6 Hours</option>
+                <option value="every-8h">Every 8 Hours (3x Daily)</option>
                 <option value="every-12h">Every 12 Hours (Twice Daily)</option>
                 <option value="daily-9am">Daily at 9:00 AM</option>
                 <option value="daily-6pm">Daily at 6:00 PM</option>
