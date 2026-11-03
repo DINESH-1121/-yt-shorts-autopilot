@@ -898,6 +898,21 @@ async function loadAutoPilotConfig() {
       autoTrending.checked = autopilotConfig.autoTrending !== false;
     }
 
+    // Populate Topaz Video AI
+    const topazEnable = document.getElementById('topaz-enable');
+    const topazModel = document.getElementById('topaz-model');
+    const topazResolution = document.getElementById('topaz-resolution');
+    const topazCliPath = document.getElementById('topaz-cli-path');
+    const topazArgs = document.getElementById('topaz-args');
+
+    if (topazEnable) topazEnable.checked = !!autopilotConfig.enableTopazEnhancement;
+    if (topazModel) topazModel.value = autopilotConfig.topazModel || 'auto';
+    if (topazResolution) topazResolution.value = autopilotConfig.topazResolution || '1440x2560';
+    if (topazCliPath) topazCliPath.value = autopilotConfig.topazCliPath || '';
+    if (topazArgs) topazArgs.value = autopilotConfig.topazArgsTemplate || '';
+
+    checkSystemAppsStatus();
+
     renderSources();
   } catch (err) {
     console.error('Failed to load autopilot config:', err);
@@ -1023,6 +1038,47 @@ async function saveAutoPilotConfig() {
   }
 }
 
+async function saveEnhancementSettings() {
+  if (!autopilotConfig) return;
+
+  const topazEnable = document.getElementById('topaz-enable');
+  const topazModel = document.getElementById('topaz-model');
+  const topazResolution = document.getElementById('topaz-resolution');
+  const topazCliPath = document.getElementById('topaz-cli-path');
+  const topazArgs = document.getElementById('topaz-args');
+
+  autopilotConfig.enableTopazEnhancement = topazEnable ? topazEnable.checked : false;
+  autopilotConfig.topazModel = topazModel ? topazModel.value : 'auto';
+  autopilotConfig.topazResolution = topazResolution ? topazResolution.value : '1440x2560';
+  autopilotConfig.topazCliPath = topazCliPath ? topazCliPath.value.trim() : '';
+  autopilotConfig.topazArgsTemplate = topazArgs ? topazArgs.value.trim() : '';
+
+  delete autopilotConfig.openInFinalCutAfterRender;
+  delete autopilotConfig.finalCutMode;
+  delete autopilotConfig.pauseUploadForFinalCutReview;
+
+  await saveAutoPilotConfig();
+}
+
+async function checkSystemAppsStatus() {
+  const topazBadge = document.getElementById('topaz-detected-badge');
+  try {
+    const res = await fetch('/api/system/apps-status');
+    const data = await res.json();
+    if (topazBadge) {
+      if (data.topaz?.installed) {
+        topazBadge.textContent = 'Topaz: Detected';
+        topazBadge.className = 'pill-badge pill-on';
+      } else {
+        topazBadge.textContent = 'Topaz: Not Found';
+        topazBadge.className = 'pill-badge pill-off';
+      }
+    }
+  } catch (err) {
+    console.warn('Apps status check failed:', err);
+  }
+}
+
 function runAutoPilotNow() {
   btnRunAutopilot.disabled = true;
   btnRunText.classList.add('hidden');
@@ -1105,7 +1161,6 @@ async function loadHistory() {
             <span>${item.uploadedAt ? new Date(item.uploadedAt).toLocaleDateString() : ''}</span>
           </div>
         `;
-      } else {
         div.innerHTML = `
           <div class="history-header">
             <span class="history-title">${item.newTitle || 'Uploaded Short'}</span>

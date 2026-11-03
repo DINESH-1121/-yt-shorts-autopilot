@@ -438,6 +438,70 @@
           </div>
         </div>
 
+        <!-- Topaz Video AI Neural Finishing Studio -->
+        <div class="card" id="topaz-card">
+          <div class="card-header">
+            <div class="flex-between">
+              <div>
+                <h3>✨ Topaz Video AI Neural Enhancement</h3>
+                <p class="subtitle">Automated background AI upscaling and artifact reduction powered by your Mac GPU</p>
+              </div>
+              <div>
+                <span id="topaz-detected-badge" class="pill-badge pill-off">Topaz: Scanning...</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+              <label class="checkbox-container" for="topaz-enable" style="margin-bottom: 0; font-weight: 600; font-size: 1rem;">
+                <input type="checkbox" id="topaz-enable" onchange="saveEnhancementSettings()" />
+                <span>⚡ Enable Automated Topaz Video AI Enhancement</span>
+              </label>
+              <span class="pro-tag" style="background: linear-gradient(135deg, #10b981, #059669);">GPU ACCELERATED</span>
+            </div>
+            <p class="subtitle" style="margin-bottom: 1rem;">
+              Replaces standard resizing with Topaz's neural network upscaler for crisp detail, deblurring, and noise removal.
+            </p>
+
+            <div id="topaz-settings-panel" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="topaz-model" style="font-size: 0.85rem; font-weight: 600;">AI Model</label>
+                <select id="topaz-model" class="form-control" onchange="saveEnhancementSettings()">
+                  <option value="auto" selected>🤖 Dynamic Auto-Select (Content &amp; Quality Aware - Recommended)</option>
+                  <option value="prob-4">Proteus (prob-4) - Auto-Tune &amp; Detail Recovery</option>
+                  <option value="ahq-12">Artemis (ahq-12) - High Quality &amp; Clean Denoise</option>
+                  <option value="iris-2">Iris (iris-2) - Face &amp; Portrait Detail Restoration</option>
+                  <option value="ghq-5">Gaia (ghq-5) - Sharp High Detail / CGI</option>
+                </select>
+                <small class="subtitle" style="font-size: 0.75rem;">Neural model applied before YouTube upload.</small>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="topaz-resolution" style="font-size: 0.85rem; font-weight: 600;">Output Resolution</label>
+                <select id="topaz-resolution" class="form-control" onchange="saveEnhancementSettings()">
+                  <option value="1440x2560" selected>1440x2560 (2K QHD Shorts - Highest YouTube Bitrate)</option>
+                  <option value="1080x1920">1080x1920 (Standard Full HD 1080p Shorts)</option>
+                  <option value="1x">1x Original Canvas (Clarity enhance without resizing)</option>
+                </select>
+                <small class="subtitle" style="font-size: 0.75rem;">1440p triggers YouTube's highest quality VP9/AV1 profile.</small>
+              </div>
+            </div>
+
+            <div style="margin-top: 0.85rem; font-size: 0.8rem; color: #10b981; display: flex; align-items: center; gap: 0.4rem;">
+              <span>⚡ Apple Silicon VideoToolbox Hardware Encoding enabled for ultra-fast rendering</span>
+            </div>
+
+            <details style="margin-top: 0.75rem; font-size: 0.8rem; color: #94a3b8;">
+              <summary style="cursor: pointer; color: #94a3b8; user-select: none;">Advanced Topaz CLI overrides</summary>
+              <div style="margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                <input type="text" id="topaz-cli-path" placeholder="Default: /Applications/Topaz Video AI.app/Contents/MacOS/ffmpeg" onchange="saveEnhancementSettings()" style="font-size: 0.8rem;" />
+                <input type="text" id="topaz-args" placeholder="Custom arguments (leave blank for automatic optimal parameters)" onchange="saveEnhancementSettings()" style="font-size: 0.8rem;" />
+              </div>
+            </details>
+          </div>
+        </div>
+
         <!-- Dynamic Upload Cadence (Schedule) Studio -->
         <div class="card" id="cadence-card">
           <div class="card-header">

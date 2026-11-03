@@ -21,6 +21,7 @@ const { checkVideoQuality, heuristicQualityCheck } = require('./lib/qualityCheck
 const { createBeatSyncedShort } = require('./lib/beatSyncTranscoder');
 const { applyVisualHookInPlace, generateHookText } = require('./lib/visualHook');
 const { enhanceForYouTubeShortsInPlace } = require('./lib/localEnhancer');
+const { enhanceWithTopazInPlace, getTopazInfo } = require('./lib/topazEnhancer');
 const {
   COLOR_GRADING_PRESETS,
   getVisualIdentityConfig,
@@ -629,8 +630,8 @@ app.get('/api/upload', async (req, res) => {
 
     let intermediateFile = filePath;
 
-    // Step 2b: Beat-Sync Phonk Audio Mixing (if enabled or default)
-    if (config.enableBeatSync !== false) {
+    // Step 2b: Beat-Sync Phonk Audio Mixing (if explicitly enabled)
+    if (config.enableBeatSync === true) {
       try {
         sendEvent('progress', { message: '🎵 Applying beat-sync Phonk mixing (100% music + 18% dialogue ducking)...' });
         const beatResult = await createBeatSyncedShort(intermediateFile, {}, (msg) => sendEvent('progress', { message: msg }));
@@ -694,9 +695,29 @@ app.get('/api/upload', async (req, res) => {
       sendEvent('progress', { message: `⚠️ Branding could not be applied: ${identityErr.message}` });
     }
 
-    // Final local, Topaz-style finishing pass. This is intentionally last so
-    // overlays remain crisp and YouTube receives one high-bitrate 1440p Short.
-    if (config.enableLocalEnhancement !== false) {
+    // Final enhancement is last so text and branding stay sharp. Topaz replaces
+    // the local FFmpeg pass when explicitly configured; a failed Topaz run falls
+    // back to the existing local pass so publishing can continue.
+    if (config.enableTopazEnhancement === true) {
+      try {
+        await enhanceWithTopazInPlace(finalShortPath, {
+          model: config.topazModel || 'auto',
+          resolution: config.topazResolution || '1440x2560',
+          title: uploadMetadata.title || metadata.title,
+          description: metadata.description,
+          executable: config.topazCliPath || process.env.TOPAZ_VIDEO_AI_CLI,
+          argsTemplate: config.topazArgsTemplate || process.env.TOPAZ_VIDEO_AI_ARGS,
+          onProgress: (msg) => sendEvent('progress', { message: msg })
+        });
+        sendEvent('progress', { message: '✅ Topaz Video AI enhancement applied.' });
+      } catch (topazErr) {
+        console.warn('[Server] Topaz enhancement failed; falling back to local enhancement:', topazErr.message);
+        sendEvent('progress', { message: `⚠️ Topaz unavailable: ${topazErr.message}. Using local enhancement instead.` });
+        if (config.enableLocalEnhancement !== false) {
+          await enhanceForYouTubeShortsInPlace(finalShortPath, (msg) => sendEvent('progress', { message: msg }));
+        }
+      }
+    } else if (config.enableLocalEnhancement !== false) {
       try {
         await enhanceForYouTubeShortsInPlace(finalShortPath, (enhanceMsg) => {
           sendEvent('progress', { message: enhanceMsg });
@@ -725,7 +746,8 @@ app.get('/api/upload', async (req, res) => {
       status: 'uploaded',
       privacy: result.privacy || privacy,
       publishAt: result.publishAt || null,
-      qualityCheck: qualityResult
+      qualityCheck: qualityResult,
+      localFilePath: finalShortPath
     });
 
     const completionMsg = result.publishAt
@@ -989,6 +1011,15 @@ app.post('/api/quality/check', async (req, res) => {
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
+});
+
+// System Apps Integration Status (Topaz Video AI)
+app.get('/api/system/apps-status', (req, res) => {
+  const topaz = getTopazInfo();
+  res.json({
+    ok: true,
+    topaz
+  });
 });
 
 // ── Start Server ─────────────────────────────────────────────────────────
