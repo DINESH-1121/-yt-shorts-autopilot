@@ -32,7 +32,8 @@
         "fade": 0.015,
         "vignette": 0.1,
         "filmGrain": 0.025,
-        "glow": 0.025
+        "glow": 0.025,
+        "sharpen": 0
       },
       "animationStyle": "slide-reveal",
       "startTime": 1,
@@ -60,7 +61,6 @@
       "letterSpacing": 6,
       "primaryColor": "#f4f7ff",
       "secondaryColor": "#dfeaff",
-      "glowColor": "#a8ddff",
       "outlineColor": "#0a0c10",
       "outlineWidth": 0,
       "shadow": 0.68,
@@ -95,7 +95,8 @@
         "x": 0.5,
         "y": 0.87
       },
-      "enabled": true
+      "enabled": true,
+      "glowColor": "#a8ddff"
     }
   ]
 }

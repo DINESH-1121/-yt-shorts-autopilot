@@ -101,6 +101,21 @@ async function runTests() {
   assert(liveSlop.decision === 'REJECT', 'OpenCode rejects video with AI generated slop');
   assert(liveSlop.isAiSlop === true, 'isAiSlop is true');
 
+  // Test 7: Watermark Exemption Policy (Watermarks Allowed on Screen)
+  console.log('\n── Test 7: Watermark Exemption Policy (Watermarks Allowed) ──');
+  const liveWatermark = await checkVideoQuality({
+    videoPath: testVideoPath,
+    metadata: {
+      title: 'IRON MAN 🔥 ONE LAST SNAP 💔 | Tony Stark Cinematic Edit #shorts',
+      uploader: 'Unique_editz',
+      description: 'Fan edit featuring burnt-in VYXZ watermark plastered on screen'
+    }
+  });
+  console.log(`  Decision: ${liveWatermark.decision} (by ${liveWatermark.usedModel})`);
+  console.log(`  Reason: ${liveWatermark.reason}`);
+  assert(liveWatermark.decision === 'PASS', 'Watermark plastered across video is ALLOWED');
+  assert(liveWatermark.isAiSlop === false, 'isAiSlop is false');
+
   // Cleanup
   try { if (fs.existsSync(testVideoPath)) fs.unlinkSync(testVideoPath); } catch {}
 
